@@ -1,0 +1,438 @@
+import type { WorkflowPluginManifest } from "../types";
+
+const accent = {
+  trigger: "from-amber-400 via-orange-400 to-orange-500",
+  action: "from-stone-900 via-stone-800 to-stone-700",
+  logic: "from-emerald-500 via-teal-500 to-cyan-500",
+  data: "from-sky-500 via-blue-500 to-indigo-500",
+} as const;
+
+export const plugin: WorkflowPluginManifest = {
+  id: "core",
+  title: "Core",
+  description: "Built-in workflow primitives.",
+  connections: [
+    {
+      provider: "webhook",
+      title: "Outbound webhook",
+      description: "Signed endpoint we call with a shared secret header.",
+      monogram: "WH",
+      fields: [
+        {
+          key: "url",
+          label: "Target URL",
+          kind: "url",
+          placeholder: "https://example.com/ingest",
+          required: true,
+        },
+        {
+          key: "signingSecret",
+          label: "Signing secret",
+          kind: "password",
+          placeholder: "whsec_…",
+          secret: true,
+        },
+      ],
+    },
+    {
+      provider: "database",
+      title: "D1 database",
+      description: "Reference an existing Cloudflare D1 database binding.",
+      monogram: "D1",
+      fields: [
+        {
+          key: "binding",
+          label: "Binding name",
+          kind: "text",
+          placeholder: "DB",
+          required: true,
+        },
+        {
+          key: "defaultSchema",
+          label: "Default schema",
+          kind: "text",
+          placeholder: "main",
+        },
+      ],
+    },
+    {
+      provider: "workers-ai",
+      title: "Workers AI",
+      description:
+        "Cloudflare Workers AI account used for text and image models.",
+      monogram: "AI",
+      fields: [
+        {
+          key: "accountId",
+          label: "Account ID",
+          kind: "text",
+          placeholder: "abc123…",
+          required: true,
+        },
+        {
+          key: "apiToken",
+          label: "API token",
+          kind: "password",
+          placeholder: "cf_…",
+          required: true,
+          secret: true,
+        },
+      ],
+    },
+    {
+      provider: "custom",
+      title: "Custom",
+      description: "Free-form provider with arbitrary config and secrets.",
+      monogram: "CU",
+      fields: [
+        {
+          key: "baseUrl",
+          label: "Base URL",
+          kind: "url",
+          placeholder: "https://api.example.com",
+        },
+        {
+          key: "apiKey",
+          label: "API key",
+          kind: "password",
+          secret: true,
+        },
+      ],
+    },
+  ],
+  nodes: [
+    {
+      kind: "schedule",
+      family: "trigger",
+      title: "Schedule",
+      subtitle: "Dispatch on a recurring cron cadence.",
+      accent: accent.trigger,
+      defaultConfig: { cron: "0 * * * *", timezone: "UTC" },
+      fields: [
+        {
+          key: "cron",
+          label: "Cron",
+          kind: "text",
+          required: true,
+          placeholder: "0 * * * *",
+        },
+        {
+          key: "timezone",
+          label: "Timezone",
+          kind: "text",
+          required: true,
+          placeholder: "UTC",
+        },
+      ],
+    },
+    {
+      kind: "webhook",
+      family: "trigger",
+      title: "Receive webhook",
+      subtitle: "Accept signed payloads from any service.",
+      accent: accent.trigger,
+      defaultConfig: { pathSuffix: "", secretKey: "" },
+      fields: [
+        {
+          key: "pathSuffix",
+          label: "Path suffix",
+          kind: "text",
+          placeholder: "orders",
+        },
+        {
+          key: "secretKey",
+          label: "Shared secret",
+          kind: "text",
+          placeholder: "whsec_...",
+        },
+      ],
+    },
+    {
+      kind: "button",
+      family: "trigger",
+      title: "Button press",
+      subtitle: "Run manually from the dashboard or editor.",
+      accent: accent.trigger,
+      defaultConfig: { buttonLabel: "Run workflow" },
+      fields: [
+        {
+          key: "buttonLabel",
+          label: "Button label",
+          kind: "text",
+          required: true,
+          placeholder: "Run workflow",
+        },
+      ],
+    },
+    {
+      kind: "wait",
+      family: "action",
+      title: "Wait",
+      subtitle: "Pause execution using Cloudflare Workflow sleep.",
+      accent: accent.action,
+      defaultConfig: { durationSeconds: 60 },
+      executionMode: "inline",
+      stepId: "wait",
+      fields: [
+        {
+          key: "durationSeconds",
+          label: "Duration (seconds)",
+          kind: "number",
+          required: true,
+          min: 1,
+        },
+      ],
+    },
+    {
+      kind: "sendWebhook",
+      family: "action",
+      title: "Send webhook",
+      subtitle: "Post templated JSON to an external endpoint.",
+      accent: accent.action,
+      defaultConfig: {
+        method: "POST",
+        url: "https://example.com/webhook",
+        headers: '{"content-type":"application/json"}',
+        body: '{"payload":"{{ trigger.data }}"}',
+      },
+      stepId: "send-webhook",
+      fields: [
+        {
+          key: "method",
+          label: "Method",
+          kind: "select",
+          required: true,
+          options: [
+            { label: "GET", value: "GET" },
+            { label: "POST", value: "POST" },
+            { label: "PUT", value: "PUT" },
+            { label: "PATCH", value: "PATCH" },
+            { label: "DELETE", value: "DELETE" },
+          ],
+        },
+        {
+          key: "url",
+          label: "URL",
+          kind: "text",
+          required: true,
+          placeholder: "https://example.com/webhook",
+        },
+        {
+          key: "headers",
+          label: "Headers JSON",
+          kind: "json",
+          placeholder: '{"content-type":"application/json"}',
+        },
+        {
+          key: "body",
+          label: "Body",
+          kind: "textarea",
+          allowTemplates: true,
+          placeholder: '{"payload":"{{ trigger.data }}"}',
+        },
+      ],
+    },
+    {
+      kind: "aiText",
+      family: "action",
+      title: "AI text",
+      subtitle: "Generate or summarize with Workers AI.",
+      accent: accent.action,
+      defaultConfig: {
+        model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+        prompt: "Summarize {{ trigger.data }} into crisp action items.",
+      },
+      stepId: "ai-text",
+      fields: [
+        {
+          key: "model",
+          label: "Model",
+          kind: "text",
+          required: true,
+        },
+        {
+          key: "prompt",
+          label: "Prompt",
+          kind: "textarea",
+          required: true,
+          allowTemplates: true,
+        },
+      ],
+    },
+    {
+      kind: "aiImage",
+      family: "action",
+      title: "AI image",
+      subtitle: "Create a generated image from prior step output.",
+      accent: accent.action,
+      defaultConfig: {
+        model: "@cf/black-forest-labs/flux-1-schnell",
+        prompt: "Create an editorial image based on {{ trigger.data }}.",
+      },
+      stepId: "ai-image",
+      fields: [
+        {
+          key: "model",
+          label: "Model",
+          kind: "text",
+          required: true,
+        },
+        {
+          key: "prompt",
+          label: "Prompt",
+          kind: "textarea",
+          required: true,
+          allowTemplates: true,
+        },
+      ],
+    },
+    {
+      kind: "condition",
+      family: "logic",
+      title: "Condition",
+      subtitle: "Branch on a small JavaScript expression.",
+      accent: accent.logic,
+      defaultConfig: {
+        expression: "Boolean(trigger.data)",
+      },
+      stepId: "condition",
+      fields: [
+        {
+          key: "expression",
+          label: "Expression",
+          kind: "textarea",
+          required: true,
+          placeholder: 'trigger.data?.priority === "high"',
+        },
+      ],
+    },
+    {
+      kind: "httpRequest",
+      family: "action",
+      title: "HTTP request",
+      subtitle: "Call an HTTP endpoint and pass the response onward.",
+      accent: accent.action,
+      defaultConfig: {
+        method: "GET",
+        url: "https://api.example.com/items",
+        headers: "{}",
+        body: "",
+      },
+      stepId: "http-request",
+      fields: [
+        {
+          key: "method",
+          label: "Method",
+          kind: "select",
+          required: true,
+          options: [
+            { label: "GET", value: "GET" },
+            { label: "POST", value: "POST" },
+            { label: "PUT", value: "PUT" },
+            { label: "PATCH", value: "PATCH" },
+            { label: "DELETE", value: "DELETE" },
+          ],
+        },
+        {
+          key: "url",
+          label: "URL",
+          kind: "text",
+          required: true,
+          placeholder: "https://api.example.com/items",
+        },
+        {
+          key: "headers",
+          label: "Headers JSON",
+          kind: "json",
+          placeholder: "{}",
+        },
+        {
+          key: "body",
+          label: "Body",
+          kind: "textarea",
+          allowTemplates: true,
+        },
+      ],
+    },
+    {
+      kind: "queryDatabase",
+      family: "data",
+      title: "Query database",
+      subtitle: "Run a D1 query and attach the rows downstream.",
+      accent: accent.data,
+      defaultConfig: {
+        sql: "select 1 as ok",
+      },
+      stepId: "query-database",
+      fields: [
+        {
+          key: "sql",
+          label: "SQL",
+          kind: "textarea",
+          required: true,
+        },
+      ],
+    },
+    {
+      kind: "endRun",
+      family: "action",
+      title: "End run",
+      subtitle: "Stop the current branch and halt downstream execution.",
+      accent: accent.action,
+      defaultConfig: {
+        reason: "",
+      },
+      stepId: "end-run",
+      fields: [
+        {
+          key: "reason",
+          label: "Reason",
+          kind: "text",
+          allowTemplates: true,
+          placeholder: "Stopping early because {{ trigger.data.skip }}",
+        },
+      ],
+    },
+    {
+      kind: "staticText",
+      family: "data",
+      title: "Static text",
+      subtitle: "Pin a static or templated string into the workflow context.",
+      accent: accent.data,
+      defaultConfig: {
+        value: "",
+      },
+      stepId: "static-text",
+      fields: [
+        {
+          key: "value",
+          label: "Value",
+          kind: "textarea",
+          required: true,
+          allowTemplates: true,
+          placeholder: "Hello {{ trigger.data.name }}",
+        },
+      ],
+    },
+    {
+      kind: "transformJson",
+      family: "data",
+      title: "Transform JSON",
+      subtitle: "Shape prior outputs into a clean payload.",
+      accent: accent.data,
+      defaultConfig: {
+        template: '{"summary":"{{ trigger.data }}"}',
+      },
+      stepId: "transform-json",
+      fields: [
+        {
+          key: "template",
+          label: "Template JSON",
+          kind: "json",
+          required: true,
+          allowTemplates: true,
+        },
+      ],
+    },
+  ],
+};

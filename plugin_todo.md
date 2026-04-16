@@ -1,0 +1,6 @@
+- [] Cloudflare Sandbox adapter: https://developers.cloudflare.com/sandbox/
+  - [] kinda like https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.code/
+- [] Discord Outgoing Webhook schema support https://docs.discord.com/developers/platform/webhooks
+- [] GraphQL adapter https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.graphql/
+- [] Twitter/X Adapter https://docs.x.com/overview
+- [] Firecrawl Adapter https://docs.firecrawl.dev/introduction

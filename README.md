@@ -1,73 +1,98 @@
-# React + TypeScript + Vite
+# Workerflow
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Workerflow is a Cloudflare-native visual workflow editor built with React, Vite, Tailwind CSS, Hono, Better Auth, Drizzle ORM, Jotai, and React Flow.
 
-Currently, two official plugins are available:
+It is designed around:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- multiple workflows per user
+- a canvas-first editor
+- reusable provider connections stored in KV
+- durable execution through Cloudflare Workflows
+- first-party integrations like GitHub, Linear, Workers AI, webhooks, and D1
 
-## React Compiler
+## Current Status
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+This repo now includes:
 
-## Expanding the ESLint configuration
+- a Tailwind-based application shell and editor UI
+- dashboard, workflows, workflow settings, runs, connections, and login pages
+- Better Auth-backed auth routes
+- D1-backed workflow, run, and connection persistence
+- KV-backed encrypted reusable connection secrets
+- a generic Cloudflare Workflow runner
+- dynamic schedule dispatching
+- GitHub webhook trigger verification from in-app connection secrets
+- Linear webhook trigger verification from in-app connection secrets
+- real GitHub issue creation and Linear ticket creation via direct `fetch`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Secrets Model
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Operational secrets belong in env files:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- `BETTER_AUTH_SECRET`
+- `BETTER_AUTH_URL`
+- `SECRETS_KEY`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Provider secrets do not belong in env files. They should be created inside the app as reusable connections and stored in KV.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Examples:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- GitHub personal access token
+- GitHub webhook secret
+- Linear API key
+- Linear webhook secret
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+GitHub and Linear webhook verification no longer use env fallbacks.
+
+## Local Setup
+
+1. Copy `.env.example` to `.env` if you want shell-visible values for tooling.
+2. Copy `.dev.vars.example` to `.dev.vars` for local Wrangler runtime secrets.
+3. Set real D1, KV, and Workflow bindings in `wrangler.jsonc`.
+4. Install dependencies with `pnpm install`.
+5. Generate Worker types with `pnpm cf-typegen`.
+6. Run the app with `pnpm dev`.
+
+## Core Commands
+
+- `pnpm dev`
+- `pnpm type-check`
+- `pnpm fix`
+- `pnpm build`
+- `pnpm cf-typegen`
+- `pnpm db:generate`
+- `pnpm db:push`
+
+## Development Rules
+
+This repo uses `pnpm` only.
+
+- Install packages with `pnpm add`
+- Run scripts with `pnpm <script-name>`
+- Add shadcn/ui components with `pnpm dlx shadcn@latest add <component>`
+
+Before completing work:
+
+1. Run `pnpm type-check`
+2. Run `pnpm fix`
+
+## How to Extend It
+
+The current extension model is code-first rather than auto-discovered plugin folders.
+
+To add a new workflow capability:
+
+1. Add the shared node kind in `src/lib/workflow/types.ts`
+2. Register the manifest in `src/lib/workflow/templates.ts`
+3. Extend editor handling where needed in the client
+4. Add runtime execution in `worker/services/runtime.ts`
+5. Add trigger matching in `worker/routes/triggers.ts` if it is a trigger
+6. Add connection testing in `worker/routes/connections.ts` if it needs credentials
+
+For a fuller walkthrough, see [docs/PLUGIN_DEVELOPMENT.md](./docs/PLUGIN_DEVELOPMENT.md).
+
+## Notes
+
+- This repo intentionally avoids provider SDK dependencies for workflow plugins and uses direct `fetch` instead.
+- The current implementation uses a generic runtime interpreter on top of Cloudflare Workflows rather than per-workflow generated code.
+- The editor and runtime are functional, but deployment still requires real Cloudflare binding IDs and secrets in `wrangler.jsonc` and local env files.

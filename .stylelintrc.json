@@ -1,0 +1,23 @@
+{
+  "ignoreFiles": [
+    "dist/**",
+    "public/**",
+    "src/assets/**",
+    "**/*.md",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.mjs",
+    "**/*.cjs",
+    "**/*.json",
+    "**/*.html",
+    "**/*.svg",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/*.d.ts",
+    "pnpm-lock.yaml",
+    "worker-configuration.d.ts",
+    "wrangler.jsonc"
+  ],
+  "rules": {}
+}

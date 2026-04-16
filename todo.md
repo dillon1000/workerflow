@@ -1,0 +1,8 @@
+- [x] AI generate workflow from natural language
+- [~] Export workflow as TS? if that's even possible
+- [x] End Run action
+- [x] Workflow static text data input
+- [x] Reusable snippets
+- [~] Support for other databases in the Query Data Block (done with PlanetScale)
+- [x] Support for other AI providers (openai, openrouter, anthropic, fal ai, etc.)
+- [] Reference other workflows in the workflow editor, and use their outputs as inputs, branch to other workflows (will require runtime changes)
