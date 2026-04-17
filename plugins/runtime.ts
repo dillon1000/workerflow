@@ -15,6 +15,13 @@ export interface WorkflowRepositoryLike {
   ) => Promise<ConnectionDefinition | null>;
 }
 
+export interface SubworkflowResult {
+  runId: string;
+  workflowId: string;
+  workflowName: string;
+  output: unknown;
+}
+
 export interface WorkflowStepExecutionResult {
   detail: string;
   output?: unknown;
@@ -27,10 +34,8 @@ export interface WorkflowStepExecutionContext {
     AI?: {
       run: (model: string, input: Record<string, unknown>) => Promise<unknown>;
     };
-    DB: {
-      prepare: (sql: string) => {
-        all: () => Promise<{ results: unknown[] }>;
-      };
+    HYPERDRIVE: {
+      connectionString: string;
     };
   };
   repository: WorkflowRepositoryLike;
@@ -50,6 +55,10 @@ export interface WorkflowStepExecutionContext {
     connection: ConnectionDefinition,
     keyName: string,
   ) => Promise<string | null>;
+  runSubworkflow: (
+    workflowId: string,
+    input: Record<string, unknown>,
+  ) => Promise<SubworkflowResult>;
 }
 
 export type WorkflowStepRunner = (

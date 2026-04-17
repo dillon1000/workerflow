@@ -4,6 +4,7 @@ import type {
   ConnectionDefinition,
   WorkflowDefinition,
   WorkflowGraph,
+  WorkflowMode,
   WorkflowRun,
   WorkflowSnippet,
 } from "@/lib/workflow/types";
@@ -12,10 +13,14 @@ export function getBootstrap() {
   return fetchJson<BootstrapPayload>("/api/bootstrap");
 }
 
-export function createWorkflow(name: string) {
+export function createWorkflow(
+  name: string,
+  mode: WorkflowMode = "standard",
+  parentWorkflowId?: string,
+) {
   return fetchJson<WorkflowDefinition>("/api/workflows", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, mode, parentWorkflowId }),
   });
 }
 

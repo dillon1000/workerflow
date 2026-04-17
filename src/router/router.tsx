@@ -72,6 +72,12 @@ const workflowEditorRoute = createRoute({
   component: WorkflowEditorPage,
 });
 
+const subworkflowEditorRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/workflows/$parentWorkflowId/subworkflow/$subworkflowId/editor",
+  component: WorkflowEditorPage,
+});
+
 const workflowSettingsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/workflows/$workflowId/settings",
@@ -104,6 +110,7 @@ const routeTree = rootRoute.addChildren([
       dashboardRoute,
       workflowsRoute,
       workflowEditorRoute,
+      subworkflowEditorRoute,
       workflowSettingsRoute,
       workflowRunsRoute,
       connectionsRoute,

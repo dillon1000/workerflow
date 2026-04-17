@@ -1,10 +1,17 @@
 import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import type { WorkerEnv } from "../lib/env";
+import {
+  accountTable,
+  sessionTable,
+  userTable,
+  verificationTable,
+} from "../lib/schema";
+import { createDb } from "./database";
 
-let schemaReady: Promise<void> | null = null;
-
-export function createAuth(env: WorkerEnv, request: Request) {
+export async function createAuth(env: WorkerEnv, request: Request) {
   const origin = new URL(request.url).origin;
+  const { client, db } = await createDb(env);
   const auth = betterAuth({
     basePath: "/api/auth",
     baseURL: env.BETTER_AUTH_URL ?? origin,
@@ -14,13 +21,20 @@ export function createAuth(env: WorkerEnv, request: Request) {
       enabled: true,
       autoSignIn: true,
     },
-    database: env.DB,
+    database: drizzleAdapter(db, {
+      provider: "pg",
+      schema: {
+        user: userTable,
+        session: sessionTable,
+        account: accountTable,
+        verification: verificationTable,
+      },
+    }),
   });
-
-  schemaReady ??= auth.$context.then((context) => context.runMigrations());
 
   return {
     auth,
-    ready: schemaReady,
+    ready: Promise.resolve(),
+    close: () => client.end(),
   };
 }

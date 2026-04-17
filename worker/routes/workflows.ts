@@ -7,6 +7,8 @@ import { requireSession } from "../services/session";
 
 const createWorkflowSchema = z.object({
   name: z.string().min(1).max(120),
+  mode: z.enum(["standard", "subworkflow"]).optional(),
+  parentWorkflowId: z.string().min(1).optional(),
 });
 
 const workflowGraphSchema = z.object({
@@ -70,7 +72,12 @@ export function mountWorkflowRoutes(app: Hono<{ Bindings: WorkerEnv }>) {
     const repository = await createRepository(c.env);
     const body = createWorkflowSchema.parse(await c.req.json());
     return c.json(
-      await repository.createWorkflow(session.user.id, body.name),
+      await repository.createWorkflow(
+        session.user.id,
+        body.name,
+        body.mode ?? "standard",
+        body.parentWorkflowId,
+      ),
       201,
     );
   });
@@ -123,6 +130,12 @@ export function mountWorkflowRoutes(app: Hono<{ Bindings: WorkerEnv }>) {
       c.req.param("workflowId"),
     );
     if (!workflow) return c.json({ message: "Workflow not found." }, 404);
+    if (workflow.mode === "subworkflow") {
+      return c.json(
+        { message: "Sub-workflows can only run from a parent workflow." },
+        400,
+      );
+    }
     const body = await c.req
       .json()
       .then((payload) => runWorkflowSchema.parse(payload))

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useAtomValue, useSetAtom } from "jotai";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,11 +17,13 @@ import {
 function WorkflowSettingsForm({
   name,
   description,
+  mode,
   onDelete,
   onSave,
 }: {
   name: string;
   description: string;
+  mode: "standard" | "subworkflow";
   onDelete: () => void;
   onSave: (draft: { name: string; description: string }) => void;
 }) {
@@ -36,6 +39,7 @@ function WorkflowSettingsForm({
         <h1 className="font-display text-[20px] leading-none tracking-tight">
           {name || "Untitled"}
         </h1>
+        <Badge variant="muted">{mode}</Badge>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-6">
         <div className="hairline max-w-[560px] bg-[color:var(--color-card)]">
@@ -104,6 +108,7 @@ export function WorkflowSettingsPage() {
       key={`${workflow.id}:${workflow.updatedAt}`}
       name={workflow.name}
       description={workflow.description}
+      mode={workflow.mode}
       onDelete={() => void deleteWorkflow()}
       onSave={(draft) => {
         updateMeta({

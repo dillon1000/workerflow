@@ -7,11 +7,13 @@ import type { WorkflowNodeKind } from "@/lib/workflow/types";
 interface NodeLibraryProps {
   onAddNode: (kind: WorkflowNodeKind) => void;
   hasTrigger?: boolean;
+  workflowMode?: "standard" | "subworkflow";
 }
 
 export function NodeLibrary({
   onAddNode,
   hasTrigger = false,
+  workflowMode = "standard",
 }: NodeLibraryProps) {
   const [query, setQuery] = useState("");
   const sections = templatesByFamily();
@@ -36,11 +38,18 @@ export function NodeLibrary({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {Object.entries(sections).map(([family, templates]) => {
-          const visible = templates.filter((template) =>
-            `${template.title} ${template.subtitle}`
+          const visible = templates.filter((template) => {
+            if (template.kind === "parentContext") return false;
+            if (
+              workflowMode === "subworkflow" &&
+              template.family === "trigger"
+            ) {
+              return false;
+            }
+            return `${template.title} ${template.subtitle}`
               .toLowerCase()
-              .includes(query.toLowerCase()),
-          );
+              .includes(query.toLowerCase());
+          });
 
           if (visible.length === 0) return null;
 

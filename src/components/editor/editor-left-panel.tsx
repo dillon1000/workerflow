@@ -2,7 +2,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NodeLibrary } from "@/components/editor/node-library";
 import { SnippetsPanel } from "@/components/editor/snippets-panel";
 import { GeneratePanel } from "@/components/editor/generate-panel";
-import type { WorkflowDefinition, WorkflowNodeKind } from "@/lib/workflow/types";
+import type {
+  WorkflowDefinition,
+  WorkflowNodeKind,
+} from "@/lib/workflow/types";
 
 interface EditorLeftPanelProps {
   workflow: WorkflowDefinition;
@@ -23,7 +26,11 @@ export function EditorLeftPanel({
         <TabsTrigger value="generate">Generate</TabsTrigger>
       </TabsList>
       <TabsContent value="library" className="min-h-0 flex-1">
-        <NodeLibrary hasTrigger={hasTrigger} onAddNode={onAddNode} />
+        <NodeLibrary
+          hasTrigger={hasTrigger}
+          onAddNode={onAddNode}
+          workflowMode={workflow.mode}
+        />
       </TabsContent>
       <TabsContent value="snippets" className="min-h-0 flex-1">
         <SnippetsPanel workflow={workflow} />

@@ -4,6 +4,7 @@ export type TriggerKind = string;
 
 export type WorkflowNodeKind = string;
 
+export type WorkflowMode = "standard" | "subworkflow";
 export type WorkflowStatus = "draft" | "published";
 export type RunStatus = "queued" | "running" | "complete" | "errored";
 export type JsonValue =
@@ -72,6 +73,8 @@ export interface WorkflowDefinition {
   name: string;
   slug: string;
   description: string;
+  mode: WorkflowMode;
+  parentWorkflowId?: string;
   status: WorkflowStatus;
   draftGraph: WorkflowGraph;
   publishedVersionId?: string;
@@ -114,6 +117,10 @@ export interface WorkflowRun {
   finishedAt?: string;
   durationMs?: number;
   workflowInstanceId?: string;
+  parentRunId?: string;
+  parentStepId?: string;
+  rootRunId?: string;
+  runDepth?: number;
   steps: WorkflowRunStep[];
 }
 

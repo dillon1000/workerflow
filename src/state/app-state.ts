@@ -21,13 +21,18 @@ import {
 import {
   cloneGraphWithNewIds,
   connectGraph,
+  connectGraphWithData,
   createNode,
   createStarterGraph,
+  createSubworkflowStarterGraph,
+  getSelectedEdge,
   getSelectedNode,
   hasTriggerNode,
+  isSystemTriggerNode,
   mergeGraph,
   normalizeGraph,
   removeNode,
+  updateEdgeData,
   updateNodeConfig,
   updateNodeDataField,
   workflowSlug,
@@ -43,6 +48,7 @@ import type {
   RunStatus,
   WorkflowDefinition,
   WorkflowGraph,
+  WorkflowMode,
   WorkflowNodeKind,
   WorkflowRun,
   WorkflowSnippet,
@@ -60,6 +66,7 @@ interface AppState {
   snippets: WorkflowSnippet[];
   selectedWorkflowId: string | null;
   selectedNodeId: string | null;
+  selectedEdgeId: string | null;
   activeRunId: string | null;
   rightPanelTab: "inspector" | "run";
 }
@@ -75,6 +82,7 @@ const initialState: AppState = {
   snippets: [],
   selectedWorkflowId: null,
   selectedNodeId: null,
+  selectedEdgeId: null,
   activeRunId: null,
   rightPanelTab: "inspector",
 };
@@ -127,6 +135,7 @@ export const bootstrapAtom = atom(null, async (_get, set) => {
       selectedWorkflowId:
         current.selectedWorkflowId ?? payload.workflows[0]?.id ?? null,
       selectedNodeId: current.selectedNodeId,
+      selectedEdgeId: current.selectedEdgeId,
     }));
   } catch (error) {
     set(setLoadingAtom, false);
@@ -157,6 +166,7 @@ export const selectWorkflowAtom = atom(
       ...current,
       selectedWorkflowId: workflowId,
       selectedNodeId: null,
+      selectedEdgeId: null,
     }));
   },
 );
@@ -165,13 +175,37 @@ export const selectNodeAtom = atom(null, (_get, set, nodeId: string | null) => {
   set(appStateAtom, (current) => ({
     ...current,
     selectedNodeId: nodeId,
+    selectedEdgeId: null,
+  }));
+});
+
+export const selectEdgeAtom = atom(null, (_get, set, edgeId: string | null) => {
+  set(appStateAtom, (current) => ({
+    ...current,
+    selectedNodeId: null,
+    selectedEdgeId: edgeId,
   }));
 });
 
 export const createWorkflowAtom = atom(
   null,
-  async (_get, set, name: string) => {
-    const workflow = await createWorkflow(name);
+  async (
+    _get,
+    set,
+    payload:
+      | {
+          name: string;
+          mode?: WorkflowMode;
+          parentWorkflowId?: string;
+        }
+      | string,
+  ) => {
+    const name = typeof payload === "string" ? payload : payload.name;
+    const mode =
+      typeof payload === "string" ? "standard" : (payload.mode ?? "standard");
+    const parentWorkflowId =
+      typeof payload === "string" ? undefined : payload.parentWorkflowId;
+    const workflow = await createWorkflow(name, mode, parentWorkflowId);
     set(appStateAtom, (current) => ({
       ...current,
       workflows: [
@@ -180,6 +214,7 @@ export const createWorkflowAtom = atom(
       ],
       selectedWorkflowId: workflow.id,
       selectedNodeId: workflow.draftGraph.nodes[0]?.id ?? null,
+      selectedEdgeId: null,
     }));
     toast.success("Workflow created.");
     return workflow;
@@ -241,9 +276,23 @@ export const applyNodeChangesAtom = atom(
   (get, set, payload: { workflowId: string; changes: NodeChange[] }) => {
     const workflow = get(selectedWorkflowAtomValue(payload.workflowId));
     if (!workflow) return;
+    const protectedNodeIds = new Set(
+      workflow.draftGraph.nodes
+        .filter(isSystemTriggerNode)
+        .map((node) => node.id),
+    );
+    const blockedRemoval = payload.changes.some(
+      (change) => change.type === "remove" && protectedNodeIds.has(change.id),
+    );
+    if (blockedRemoval) {
+      toast.error("The parent context trigger is required for sub-workflows.");
+    }
     const nextGraph = applyGraphNodeChanges(
       workflow.draftGraph,
-      payload.changes,
+      payload.changes.filter(
+        (change) =>
+          change.type !== "remove" || !protectedNodeIds.has(change.id),
+      ),
     );
     set(updateWorkflowGraphAtom, {
       workflowId: payload.workflowId,
@@ -264,10 +313,24 @@ export const applyEdgeChangesAtom = atom(
   (get, set, payload: { workflowId: string; changes: EdgeChange[] }) => {
     const workflow = get(selectedWorkflowAtomValue(payload.workflowId));
     if (!workflow) return;
+    const removedEdgeIds = new Set(
+      payload.changes
+        .filter(
+          (
+            change,
+          ): change is Extract<EdgeChange, { type: "remove"; id: string }> =>
+            change.type === "remove",
+        )
+        .map((change) => change.id),
+    );
     set(updateWorkflowGraphAtom, {
       workflowId: payload.workflowId,
       graph: applyGraphEdgeChanges(workflow.draftGraph, payload.changes),
     });
+    const selectedEdgeId = get(appStateAtom).selectedEdgeId;
+    if (selectedEdgeId && removedEdgeIds.has(selectedEdgeId)) {
+      set(selectEdgeAtom, null);
+    }
   },
 );
 
@@ -276,6 +339,32 @@ export const connectNodesAtom = atom(
   (get, set, payload: { workflowId: string; connection: Connection }) => {
     const workflow = get(selectedWorkflowAtomValue(payload.workflowId));
     if (!workflow) return;
+    const sourceNode = workflow.draftGraph.nodes.find(
+      (node) => node.id === payload.connection.source,
+    );
+    const outgoing = workflow.draftGraph.edges.filter(
+      (edge) => edge.source === payload.connection.source,
+    );
+    if (sourceNode?.data.kind === "condition") {
+      const branches = new Set(outgoing.map((edge) => edge.data?.branch));
+      const nextBranch = ["true", "false"].find(
+        (branch) => !branches.has(branch as "true" | "false"),
+      ) as "true" | "false" | undefined;
+      if (!nextBranch) {
+        toast.error(
+          "Condition blocks support one true path and one false path.",
+        );
+        return;
+      }
+      set(updateWorkflowGraphAtom, {
+        workflowId: payload.workflowId,
+        graph: connectGraphWithData(workflow.draftGraph, payload.connection, {
+          label: nextBranch,
+          branch: nextBranch,
+        }),
+      });
+      return;
+    }
     set(updateWorkflowGraphAtom, {
       workflowId: payload.workflowId,
       graph: connectGraph(workflow.draftGraph, payload.connection),
@@ -298,6 +387,14 @@ export const addNodeAtom = atom(
     const workflow = get(selectedWorkflowAtomValue(payload.workflowId));
     if (!workflow) return;
     const template = getWorkflowTemplate(payload.kind);
+    if (payload.kind === "parentContext") {
+      toast.error("The parent context trigger is added automatically.");
+      return;
+    }
+    if (workflow.mode === "subworkflow" && template?.family === "trigger") {
+      toast.error("Sub-workflows use a fixed parent context trigger.");
+      return;
+    }
     if (template?.family === "trigger" && hasTriggerNode(workflow.draftGraph)) {
       toast.error(
         "This workflow already has a trigger. Remove it before adding another.",
@@ -325,6 +422,11 @@ export const removeSelectedNodeAtom = atom(
     const workflow = get(selectedWorkflowAtomValue(workflowId));
     const nodeId = get(appStateAtom).selectedNodeId;
     if (!workflow || !nodeId) return;
+    const node = workflow.draftGraph.nodes.find((item) => item.id === nodeId);
+    if (node && isSystemTriggerNode(node)) {
+      toast.error("The parent context trigger is required for sub-workflows.");
+      return;
+    }
     set(updateWorkflowGraphAtom, {
       workflowId,
       graph: removeNode(workflow.draftGraph, nodeId),
@@ -378,14 +480,42 @@ export const updateSelectedNodeConfigAtom = atom(
     if (!selectedWorkflowId || !selectedNodeId) return;
     const workflow = get(selectedWorkflowAtomValue(selectedWorkflowId));
     if (!workflow) return;
+    const nextGraph = updateNodeConfig(
+      workflow.draftGraph,
+      selectedNodeId,
+      payload.key,
+      payload.value,
+    );
+    const selectedNode = workflow.draftGraph.nodes.find(
+      (node) => node.id === selectedNodeId,
+    );
+    const selectedWorkflow =
+      selectedNode?.data.kind === "runSubworkflow" &&
+      payload.key === "workflowId"
+        ? get(appStateAtom).workflows.find(
+            (item) => item.id === String(payload.value ?? ""),
+          )
+        : null;
+
     set(updateWorkflowGraphAtom, {
       workflowId: selectedWorkflowId,
-      graph: updateNodeConfig(
-        workflow.draftGraph,
-        selectedNodeId,
-        payload.key,
-        payload.value,
-      ),
+      graph:
+        selectedNode?.data.kind === "runSubworkflow" &&
+        payload.key === "workflowId"
+          ? updateNodeDataField(
+              updateNodeDataField(
+                nextGraph,
+                selectedNodeId,
+                "title",
+                selectedWorkflow?.name || "Run sub-workflow",
+              ),
+              selectedNodeId,
+              "subtitle",
+              selectedWorkflow
+                ? `Run ${selectedWorkflow.name} and pass its output onward.`
+                : "Run a published sub-workflow and use its output downstream.",
+            )
+          : nextGraph,
     });
   },
 );
@@ -516,6 +646,7 @@ export const deleteCurrentWorkflowAtom = atom(null, async (get, set) => {
       workflows,
       selectedWorkflowId: workflows[0]?.id ?? null,
       selectedNodeId: null,
+      selectedEdgeId: null,
     };
   });
   toast.success("Workflow deleted.");
@@ -609,10 +740,56 @@ export const selectedNodeAtomValue = atom((get) => {
   const state = get(appStateAtom);
   const workflow = get(currentWorkflowAtom);
   return getSelectedNode(
-    workflow?.draftGraph ?? createStarterGraph(),
+    workflow?.draftGraph ??
+      (workflow?.mode === "subworkflow"
+        ? createSubworkflowStarterGraph()
+        : createStarterGraph()),
     state.selectedNodeId,
   );
 });
+
+export const selectedEdgeAtomValue = atom((get) => {
+  const state = get(appStateAtom);
+  const workflow = get(currentWorkflowAtom);
+  return getSelectedEdge(
+    workflow?.draftGraph ??
+      (workflow?.mode === "subworkflow"
+        ? createSubworkflowStarterGraph()
+        : createStarterGraph()),
+    state.selectedEdgeId,
+  );
+});
+
+export const updateSelectedEdgeBranchAtom = atom(
+  null,
+  (get, set, branch: "true" | "false") => {
+    const { selectedWorkflowId, selectedEdgeId } = get(appStateAtom);
+    if (!selectedWorkflowId || !selectedEdgeId) return;
+    const workflow = get(selectedWorkflowAtomValue(selectedWorkflowId));
+    if (!workflow) return;
+    const selectedEdge = workflow.draftGraph.edges.find(
+      (edge) => edge.id === selectedEdgeId,
+    );
+    if (!selectedEdge) return;
+    const conflict = workflow.draftGraph.edges.some(
+      (edge) =>
+        edge.id !== selectedEdgeId &&
+        edge.source === selectedEdge.source &&
+        edge.data?.branch === branch,
+    );
+    if (conflict) {
+      toast.error(`This condition already has a ${branch} branch.`);
+      return;
+    }
+    set(updateWorkflowGraphAtom, {
+      workflowId: selectedWorkflowId,
+      graph: updateEdgeData(workflow.draftGraph, selectedEdgeId, {
+        branch,
+        label: branch,
+      }),
+    });
+  },
+);
 
 export const activeRunAtom = atom<WorkflowRun | null>((get) => {
   const { activeRunId, runs } = get(appStateAtom);
@@ -709,11 +886,7 @@ export const insertSnippetAtom = atom(
 
 export const generateWorkflowFromPromptAtom = atom(
   null,
-  async (
-    get,
-    set,
-    payload: { prompt: string; connectionAlias: string },
-  ) => {
+  async (get, set, payload: { prompt: string; connectionAlias: string }) => {
     const state = get(appStateAtom);
     const workflowId = state.selectedWorkflowId;
     if (!workflowId) {

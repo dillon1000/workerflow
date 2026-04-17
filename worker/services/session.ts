@@ -4,11 +4,15 @@ import type { WorkerEnv } from "../lib/env";
 import { createAuth } from "./auth";
 
 export async function requireSession(c: Context<{ Bindings: WorkerEnv }>) {
-  const { auth, ready } = createAuth(c.env, c.req.raw);
+  const { auth, ready, close } = await createAuth(c.env, c.req.raw);
   await ready;
-  const session = await auth.api.getSession({
-    headers: c.req.raw.headers,
-  });
+  const session = await auth.api
+    .getSession({
+      headers: c.req.raw.headers,
+    })
+    .finally(() => {
+      c.executionCtx.waitUntil(close());
+    });
 
   if (!session?.user) {
     throw new HTTPException(401, { message: "Unauthorized" });

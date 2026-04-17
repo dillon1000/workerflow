@@ -24,9 +24,11 @@ export function LoginPage() {
       {/* left brand pane */}
       <section className="hairline-r relative hidden min-w-0 flex-1 flex-col justify-between overflow-hidden bg-[color:var(--color-ink)] px-10 py-8 text-white lg:flex">
         <div className="flex items-center gap-2">
-          <span className="grid h-4 w-4 place-items-center bg-[color:var(--color-primary)] text-[10px] font-bold text-white">
-            W
-          </span>
+          <img
+            alt="Workerflow"
+            className="h-4 w-auto"
+            src="/workerflow-transparent.png"
+          />
           <span className="mono text-[12px]">workerflow</span>
           <span className="mono ml-auto text-[10px] text-white/40">
             {new Date().toISOString().split("T")[0]}
@@ -57,7 +59,7 @@ export function LoginPage() {
             </p>
             <p className="mt-4 text-[12px] leading-relaxed text-white/60">
               Webhook triggers, GitHub + Linear automations, AI steps, waits,
-              logic, and D1 queries — in one canvas-first control room.
+              logic, and PostgreSQL queries — in one canvas-first control room.
             </p>
           </div>
         </div>

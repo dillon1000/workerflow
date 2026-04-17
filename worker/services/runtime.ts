@@ -7,7 +7,7 @@ import type {
   WorkflowRuntimeStep,
   WorkflowStepExecutionContext,
 } from "../../plugins/runtime";
-import { createId } from "../../src/lib/workflow/graph";
+import { createId, validateGraph } from "../../src/lib/workflow/graph";
 import type {
   ConnectionDefinition,
   JsonValue,
@@ -57,6 +57,10 @@ function templateContext(
   );
   return {
     trigger: { data: payload, output: payload },
+    parent:
+      payload.parent && typeof payload.parent === "object"
+        ? payload.parent
+        : {},
     steps: Object.fromEntries(nodes.map((node) => [node.id, outputs[node.id]])),
     ...byTitle,
   };
@@ -93,6 +97,280 @@ function toJsonValue(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as JsonValue;
 }
 
+type ExpressionToken = {
+  type: "identifier" | "number" | "string" | "boolean" | "null" | "operator";
+  value: string;
+};
+
+function tokenizeExpression(expression: string) {
+  const tokens: ExpressionToken[] = [];
+  let index = 0;
+
+  while (index < expression.length) {
+    const char = expression[index];
+
+    if (/\s/.test(char)) {
+      index += 1;
+      continue;
+    }
+
+    const threeCharOperator = expression.slice(index, index + 3);
+    if (threeCharOperator === "===" || threeCharOperator === "!==") {
+      tokens.push({ type: "operator", value: threeCharOperator });
+      index += 3;
+      continue;
+    }
+
+    const twoCharOperator = expression.slice(index, index + 2);
+    if (["&&", "||", "==", "!=", ">=", "<=", "?."].includes(twoCharOperator)) {
+      tokens.push({ type: "operator", value: twoCharOperator });
+      index += 2;
+      continue;
+    }
+
+    if (["(", ")", "!", ".", ">", "<", ","].includes(char)) {
+      tokens.push({ type: "operator", value: char });
+      index += 1;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      let value = "";
+      const quote = char;
+      index += 1;
+      while (index < expression.length) {
+        const next = expression[index];
+        if (next === "\\") {
+          const escaped = expression[index + 1];
+          if (escaped == null) {
+            throw new Error("Unterminated string in condition expression.");
+          }
+          value += escaped;
+          index += 2;
+          continue;
+        }
+        if (next === quote) {
+          index += 1;
+          break;
+        }
+        value += next;
+        index += 1;
+      }
+      tokens.push({ type: "string", value });
+      continue;
+    }
+
+    if (/\d/.test(char)) {
+      const match = expression.slice(index).match(/^\d+(\.\d+)?/);
+      if (!match) {
+        throw new Error("Invalid numeric literal in condition expression.");
+      }
+      tokens.push({ type: "number", value: match[0] });
+      index += match[0].length;
+      continue;
+    }
+
+    if (/[A-Za-z_$]/.test(char)) {
+      const match = expression.slice(index).match(/^[A-Za-z_$][A-Za-z0-9_$]*/);
+      if (!match) {
+        throw new Error("Invalid identifier in condition expression.");
+      }
+      const value = match[0];
+      if (value === "true" || value === "false") {
+        tokens.push({ type: "boolean", value });
+      } else if (value === "null" || value === "undefined") {
+        tokens.push({ type: "null", value });
+      } else {
+        tokens.push({ type: "identifier", value });
+      }
+      index += value.length;
+      continue;
+    }
+
+    throw new Error(`Unsupported token "${char}" in condition expression.`);
+  }
+
+  return tokens;
+}
+
+function coerceBoolean(value: unknown) {
+  return Boolean(value);
+}
+
+function isEqual(left: unknown, right: unknown, strict: boolean) {
+  return strict ? left === right : left == right;
+}
+
+function compareValues(left: unknown, right: unknown, operator: string) {
+  const comparableLeft = left as string | number | bigint | boolean | Date;
+  const comparableRight = right as string | number | bigint | boolean | Date;
+  switch (operator) {
+    case ">":
+      return comparableLeft > comparableRight;
+    case "<":
+      return comparableLeft < comparableRight;
+    case ">=":
+      return comparableLeft >= comparableRight;
+    case "<=":
+      return comparableLeft <= comparableRight;
+    default:
+      throw new Error(`Unsupported comparison operator "${operator}".`);
+  }
+}
+
+function parseExpressionValue(
+  tokens: ExpressionToken[],
+  context: Record<string, unknown>,
+) {
+  let index = 0;
+
+  const peek = () => tokens[index];
+  const consume = (expected?: string) => {
+    const token = tokens[index];
+    if (!token) {
+      throw new Error("Unexpected end of condition expression.");
+    }
+    if (expected && token.value !== expected) {
+      throw new Error(`Expected "${expected}" but found "${token.value}".`);
+    }
+    index += 1;
+    return token;
+  };
+
+  const parsePrimary = (): unknown => {
+    const token = peek();
+    if (!token) {
+      throw new Error("Unexpected end of condition expression.");
+    }
+
+    if (token.value === "(") {
+      consume("(");
+      const value = parseOr();
+      consume(")");
+      return value;
+    }
+
+    if (token.value === "!") {
+      consume("!");
+      return !coerceBoolean(parsePrimary());
+    }
+
+    if (token.type === "string") {
+      consume();
+      return token.value;
+    }
+
+    if (token.type === "number") {
+      consume();
+      return Number(token.value);
+    }
+
+    if (token.type === "boolean") {
+      consume();
+      return token.value === "true";
+    }
+
+    if (token.type === "null") {
+      consume();
+      return null;
+    }
+
+    if (token.type === "identifier") {
+      if (token.value === "Boolean" && tokens[index + 1]?.value === "(") {
+        consume();
+        consume("(");
+        const value = parseOr();
+        consume(")");
+        return coerceBoolean(value);
+      }
+
+      let value = context[token.value];
+      consume();
+
+      while (peek()?.value === "." || peek()?.value === "?.") {
+        const optional = consume().value === "?.";
+        const property = consume();
+        if (property.type !== "identifier") {
+          throw new Error("Expected property name in condition expression.");
+        }
+        if (value == null) {
+          if (optional) {
+            value = undefined;
+            continue;
+          }
+          throw new Error(
+            `Cannot read property "${property.value}" from empty value.`,
+          );
+        }
+        value =
+          typeof value === "object" || typeof value === "function"
+            ? (value as Record<string, unknown>)[property.value]
+            : undefined;
+      }
+
+      return value;
+    }
+
+    throw new Error(`Unsupported token "${token.value}" in condition.`);
+  };
+
+  const parseComparison = (): unknown => {
+    let left = parsePrimary();
+    while (
+      peek() &&
+      ["===", "!==", "==", "!=", ">", "<", ">=", "<="].includes(peek()!.value)
+    ) {
+      const operator = consume().value;
+      const right = parsePrimary();
+      switch (operator) {
+        case "===":
+          left = isEqual(left, right, true);
+          break;
+        case "!==":
+          left = !isEqual(left, right, true);
+          break;
+        case "==":
+          left = isEqual(left, right, false);
+          break;
+        case "!=":
+          left = !isEqual(left, right, false);
+          break;
+        default:
+          left = compareValues(left, right, operator);
+      }
+    }
+    return left;
+  };
+
+  const parseAnd = (): unknown => {
+    let left = parseComparison();
+    while (peek()?.value === "&&") {
+      consume("&&");
+      const right = parseComparison();
+      left = coerceBoolean(left) && coerceBoolean(right);
+    }
+    return left;
+  };
+
+  const parseOr = (): unknown => {
+    let left = parseAnd();
+    while (peek()?.value === "||") {
+      consume("||");
+      const right = parseAnd();
+      left = coerceBoolean(left) || coerceBoolean(right);
+    }
+    return left;
+  };
+
+  const result = parseOr();
+  if (index < tokens.length) {
+    throw new Error(
+      `Unexpected token "${tokens[index]?.value}" in condition expression.`,
+    );
+  }
+  return result;
+}
+
 function evaluateExpression(
   expression: string,
   payload: Record<string, unknown>,
@@ -100,11 +378,8 @@ function evaluateExpression(
   nodes: WorkflowNode[],
 ) {
   const context = templateContext(payload, outputs, nodes);
-  const fn = new Function(
-    "context",
-    `const { trigger, steps, ...nodes } = context; return Boolean(${expression});`,
-  ) as (context: Record<string, unknown>) => boolean;
-  return fn(context);
+  const tokens = tokenizeExpression(expression);
+  return coerceBoolean(parseExpressionValue(tokens, context));
 }
 
 function parseList(value: string) {
@@ -199,6 +474,22 @@ async function executeNode(
     getConnection: (alias: string) => getConnection(userId, repository, alias),
     getConnectionSecret: (connection: ConnectionDefinition, keyName: string) =>
       getConnectionSecret(env, userId, connection, keyName),
+    runSubworkflow: async (
+      workflowId: string,
+      input: Record<string, unknown>,
+    ) =>
+      runSubworkflow(
+        repository,
+        env,
+        userId,
+        workflowId,
+        input,
+        runId,
+        node.id,
+        step,
+        outputs,
+        nodes,
+      ),
   };
 
   const result = await runner(context);
@@ -249,6 +540,101 @@ interface RunnerPayload {
   payload: Record<string, unknown>;
 }
 
+interface WorkflowExecutionResult {
+  status: "complete" | "errored";
+  steps: WorkflowRunStep[];
+  output: unknown;
+}
+
+async function runSubworkflow(
+  repository: Repository,
+  env: WorkerEnv,
+  userId: string,
+  workflowId: string,
+  payload: Record<string, unknown>,
+  parentRunId: string,
+  parentStepId: string,
+  step: WorkflowStep,
+  parentOutputs: Record<string, unknown>,
+  parentNodes: WorkflowNode[],
+) {
+  const parentRun = await repository.getRun(userId, parentRunId);
+  const parentWorkflowId = parentRun?.workflowId;
+  const workflow = await repository.getPublishedSubworkflow(
+    userId,
+    workflowId,
+    parentWorkflowId,
+  );
+  if (!workflow || !workflow.publishedVersionId) {
+    throw new Error(
+      "Referenced sub-workflow must be published before it can run.",
+    );
+  }
+
+  const version = await repository.getVersion(
+    userId,
+    workflow.publishedVersionId,
+  );
+  if (!version) {
+    throw new Error("Published sub-workflow definition could not be loaded.");
+  }
+  const childRun: WorkflowRun = {
+    id: createId("run"),
+    workflowId: workflow.id,
+    workflowName: workflow.name,
+    versionId: workflow.publishedVersionId,
+    triggerKind: "parentContext",
+    status: "running",
+    startedAt: new Date().toISOString(),
+    parentRunId,
+    parentStepId,
+    rootRunId: parentRun?.rootRunId ?? parentRunId,
+    runDepth: (parentRun?.runDepth ?? 0) + 1,
+    steps: [],
+  };
+  await repository.createRun(userId, childRun);
+
+  const started = Date.now();
+  const result = await executeWorkflowGraph(
+    repository,
+    env,
+    userId,
+    workflow,
+    version.definition,
+    childRun.id,
+    {
+      ...payload,
+      parent: Object.fromEntries(
+        parentNodes.map((node) => [
+          node.data.title,
+          {
+            data: parentOutputs[node.id] ?? null,
+            output: parentOutputs[node.id] ?? null,
+          },
+        ]),
+      ),
+    },
+    step,
+  );
+  await repository.updateRun(userId, childRun.id, {
+    status: result.status,
+    finishedAt: new Date().toISOString(),
+    durationMs: Date.now() - started,
+    steps: result.steps,
+  });
+
+  if (result.status === "errored") {
+    throw new Error(`Sub-workflow "${workflow.name}" failed.`);
+  }
+
+  return {
+    runId: childRun.id,
+    workflowId: workflow.id,
+    workflowName: workflow.name,
+    output: result.output ?? null,
+  };
+}
+
 export async function launchWorkflowRun(
   repository: Repository,
   env: WorkerEnv,
@@ -266,8 +652,11 @@ export async function launchWorkflowRun(
     triggerKind,
     status: "queued",
     startedAt: new Date().toISOString(),
+    rootRunId: undefined,
+    runDepth: 0,
     steps: [],
   };
+  run.rootRunId = run.id;
   await repository.createRun(userId, run);
 
   if (!env.WORKFLOW_RUNNER) {
@@ -296,15 +685,14 @@ async function executeWorkflowGraph(
   repository: Repository,
   env: WorkerEnv,
   userId: string,
+  workflow: Pick<WorkflowDefinition, "id" | "name" | "mode">,
   graph: WorkflowGraph,
   runId: string,
   payload: Record<string, unknown>,
   step: WorkflowStep,
-) {
-  const validation = graph.nodes.filter(
-    (node) => node.data.family === "trigger",
-  );
-  const triggerNode = validation[0];
+): Promise<WorkflowExecutionResult> {
+  const validation = validateGraph(graph, workflow.mode);
+  const triggerNode = validation.triggerNode;
   if (!triggerNode) {
     throw new Error("A published workflow must have a trigger node.");
   }
@@ -314,6 +702,7 @@ async function executeWorkflowGraph(
   const queue = [triggerNode.id];
   const visited = new Set<string>();
   const steps: WorkflowRunStep[] = [];
+  let finalOutput: unknown = null;
 
   const persistProgress = async (status: "running" | "errored") => {
     try {
@@ -375,6 +764,7 @@ async function executeWorkflowGraph(
 
       steps[steps.length - 1] = nodeStep;
       outputs[node.id] = nodeStep.output;
+      finalOutput = nodeStep.output ?? finalOutput;
       await persistProgress("running");
       for (const next of nextNodes(graph, node, nodeStep.output)) {
         queue.push(next);
@@ -397,6 +787,7 @@ async function executeWorkflowGraph(
       return {
         status: "errored" as const,
         steps,
+        output: null,
       };
     }
   }
@@ -404,6 +795,7 @@ async function executeWorkflowGraph(
   return {
     status: "complete" as const,
     steps,
+    output: finalOutput,
   };
 }
 
@@ -439,6 +831,7 @@ export class WorkflowRunner extends WorkflowEntrypoint<
       repository,
       this.env,
       event.payload.userId,
+      workflow,
       graph,
       event.payload.runId,
       event.payload.payload,

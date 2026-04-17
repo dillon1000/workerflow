@@ -8,7 +8,7 @@ It is designed around:
 - a canvas-first editor
 - reusable provider connections stored in KV
 - durable execution through Cloudflare Workflows
-- first-party integrations like GitHub, Linear, Workers AI, webhooks, and D1
+- first-party integrations like GitHub, Linear, Workers AI, webhooks, and PostgreSQL
 
 ## Current Status
 
@@ -17,7 +17,7 @@ This repo now includes:
 - a Tailwind-based application shell and editor UI
 - dashboard, workflows, workflow settings, runs, connections, and login pages
 - Better Auth-backed auth routes
-- D1-backed workflow, run, and connection persistence
+- PostgreSQL-backed workflow, run, and connection persistence
 - KV-backed encrypted reusable connection secrets
 - a generic Cloudflare Workflow runner
 - dynamic schedule dispatching
@@ -48,7 +48,7 @@ GitHub and Linear webhook verification no longer use env fallbacks.
 
 1. Copy `.env.example` to `.env` if you want shell-visible values for tooling.
 2. Copy `.dev.vars.example` to `.dev.vars` for local Wrangler runtime secrets.
-3. Set real D1, KV, and Workflow bindings in `wrangler.jsonc`.
+3. Set real Hyperdrive, KV, and Workflow bindings in `wrangler.jsonc`.
 4. Install dependencies with `pnpm install`.
 5. Generate Worker types with `pnpm cf-typegen`.
 6. Run the app with `pnpm dev`.

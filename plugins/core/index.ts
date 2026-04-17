@@ -36,22 +36,23 @@ export const plugin: WorkflowPluginManifest = {
     },
     {
       provider: "database",
-      title: "D1 database",
-      description: "Reference an existing Cloudflare D1 database binding.",
-      monogram: "D1",
+      title: "PostgreSQL database",
+      description:
+        "Reference a PostgreSQL database available through Cloudflare Hyperdrive.",
+      monogram: "PG",
       fields: [
         {
           key: "binding",
           label: "Binding name",
           kind: "text",
-          placeholder: "DB",
+          placeholder: "HYPERDRIVE",
           required: true,
         },
         {
           key: "defaultSchema",
           label: "Default schema",
           kind: "text",
-          placeholder: "main",
+          placeholder: "public",
         },
       ],
     },
@@ -101,6 +102,15 @@ export const plugin: WorkflowPluginManifest = {
     },
   ],
   nodes: [
+    {
+      kind: "parentContext",
+      family: "trigger",
+      title: "Context from parent workflow",
+      subtitle: "Receive structured input from a parent workflow.",
+      accent: accent.trigger,
+      defaultConfig: {},
+      fields: [],
+    },
     {
       kind: "schedule",
       family: "trigger",
@@ -180,6 +190,34 @@ export const plugin: WorkflowPluginManifest = {
           kind: "number",
           required: true,
           min: 1,
+        },
+      ],
+    },
+    {
+      kind: "runSubworkflow",
+      family: "action",
+      title: "Run sub-workflow",
+      subtitle: "Run a published sub-workflow and use its output downstream.",
+      accent: accent.action,
+      defaultConfig: {
+        workflowId: "",
+        input: '{"input":"{{ trigger.data }}"}',
+      },
+      stepId: "run-subworkflow",
+      fields: [
+        {
+          key: "workflowId",
+          label: "Sub-workflow",
+          kind: "workflow",
+          required: true,
+        },
+        {
+          key: "input",
+          label: "Input JSON",
+          kind: "json",
+          required: true,
+          allowTemplates: true,
+          placeholder: '{"input":"{{ trigger.data }}"}',
         },
       ],
     },
@@ -358,7 +396,7 @@ export const plugin: WorkflowPluginManifest = {
       kind: "queryDatabase",
       family: "data",
       title: "Query database",
-      subtitle: "Run a D1 query and attach the rows downstream.",
+      subtitle: "Run a PostgreSQL query and attach the rows downstream.",
       accent: accent.data,
       defaultConfig: {
         sql: "select 1 as ok",

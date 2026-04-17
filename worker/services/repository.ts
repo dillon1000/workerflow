@@ -1,8 +1,8 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
 import type { InferSelectModel } from "drizzle-orm";
 import {
   createId,
+  createSubworkflowStarterGraph,
   createStarterGraph,
   validateGraph,
   workflowSlug,
@@ -15,6 +15,7 @@ import type {
   TriggerKind,
   WorkflowDefinition,
   WorkflowGraph,
+  WorkflowMode,
   WorkflowRun,
   WorkflowRunStep,
   WorkflowSnippet,
@@ -34,6 +35,7 @@ import {
   workflowVersionsTable,
   workflowWebhookEndpointsTable,
 } from "../lib/schema";
+import { createDb } from "./database";
 
 type WorkflowRow = InferSelectModel<typeof workflowsTable>;
 type VersionRow = InferSelectModel<typeof workflowVersionsTable>;
@@ -41,153 +43,6 @@ type RunRow = InferSelectModel<typeof workflowRunsTable>;
 type StepRow = InferSelectModel<typeof workflowRunStepsTable>;
 type ConnectionRow = InferSelectModel<typeof connectionsTable>;
 type SecretMetadataRow = InferSelectModel<typeof connectionSecretMetadataTable>;
-
-let schemaReady: Promise<void> | null = null;
-
-async function ensureSchema(env: WorkerEnv) {
-  if (!schemaReady) {
-    schemaReady = env.DB.batch([
-      env.DB.prepare(`
-        create table if not exists workflows (
-          id text primary key,
-          user_id text not null,
-          name text not null,
-          slug text not null,
-          description text not null,
-          status text not null,
-          draft_graph_json text not null,
-          published_version_id text,
-          last_published_at text,
-          created_at text not null,
-          updated_at text not null
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists workflow_versions (
-          id text primary key,
-          workflow_id text not null,
-          user_id text not null,
-          version integer not null,
-          definition_json text not null,
-          created_at text not null
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists workflow_runs (
-          id text primary key,
-          workflow_id text not null,
-          user_id text not null,
-          workflow_name text not null,
-          version_id text,
-          trigger_kind text not null,
-          status text not null,
-          started_at text not null,
-          finished_at text,
-          duration_ms integer,
-          workflow_instance_id text
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists workflow_run_steps (
-          id text primary key,
-          run_id text not null,
-          node_id text not null,
-          node_title text not null,
-          kind text not null,
-          status text not null,
-          detail text not null,
-          output_json text,
-          started_at text not null,
-          finished_at text,
-          duration_ms integer
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists connections (
-          id text primary key,
-          user_id text not null,
-          provider text not null,
-          alias text not null,
-          label text not null,
-          status text not null,
-          config_json text not null,
-          notes text not null,
-          created_at text not null,
-          updated_at text not null
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists connection_secret_metadata (
-          id text primary key,
-          connection_id text not null,
-          user_id text not null,
-          provider text not null,
-          key_name text not null,
-          has_value integer not null default 0,
-          updated_at text not null
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists workflow_triggers (
-          id text primary key,
-          workflow_id text not null,
-          user_id text not null,
-          node_id text not null,
-          kind text not null,
-          config_json text not null
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists workflow_webhook_endpoints (
-          id text primary key,
-          workflow_id text not null,
-          user_id text not null,
-          trigger_node_id text not null,
-          path text not null,
-          updated_at text not null
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists workflow_schedule_state (
-          id text primary key,
-          workflow_id text not null,
-          user_id text not null,
-          trigger_node_id text not null,
-          cron text not null,
-          last_dispatched_at text,
-          updated_at text not null
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists workflow_snippets (
-          id text primary key,
-          user_id text not null,
-          name text not null,
-          description text not null,
-          graph_json text not null,
-          created_at text not null,
-          updated_at text not null
-        );
-      `),
-      env.DB.prepare(`
-        create table if not exists workflow_publish_state (
-          workflow_id text primary key,
-          user_id text not null,
-          current_version_id text not null,
-          published_at text not null,
-          checksum text not null
-        );
-      `),
-      env.DB.prepare(
-        `create index if not exists workflows_user_id_idx on workflows(user_id);`,
-      ),
-      env.DB.prepare(
-        `create unique index if not exists connection_alias_idx on connections(user_id, alias);`,
-      ),
-    ]).then(() => undefined);
-  }
-  await schemaReady;
-}
 
 function median(values: number[]) {
   if (values.length === 0) return 0;
@@ -260,6 +115,10 @@ function parseRun(row: RunRow, steps: StepRow[]): WorkflowRun {
     finishedAt: row.finishedAt ?? undefined,
     durationMs: row.durationMs ?? undefined,
     workflowInstanceId: row.workflowInstanceId ?? undefined,
+    parentRunId: row.parentRunId ?? undefined,
+    parentStepId: row.parentStepId ?? undefined,
+    rootRunId: row.rootRunId ?? undefined,
+    runDepth: row.runDepth ?? undefined,
     steps: steps
       .filter((step) => step.runId === row.id)
       .map<WorkflowRunStep>((step) => ({
@@ -305,6 +164,8 @@ function parseWorkflow(
     name: row.name,
     slug: row.slug,
     description: row.description,
+    mode: (row.mode ?? "standard") as WorkflowMode,
+    parentWorkflowId: row.parentWorkflowId ?? undefined,
     status: row.status as WorkflowDefinition["status"],
     draftGraph: JSON.parse(row.draftGraphJson) as WorkflowGraph,
     publishedVersionId: row.publishedVersionId ?? undefined,
@@ -346,7 +207,18 @@ export interface Repository {
     userId: string,
     versionId: string,
   ): Promise<WorkflowVersion | null>;
-  createWorkflow(userId: string, name: string): Promise<WorkflowDefinition>;
+  createWorkflow(
+    userId: string,
+    name: string,
+    mode?: WorkflowMode,
+    parentWorkflowId?: string,
+  ): Promise<WorkflowDefinition>;
+  listSubworkflows(userId: string): Promise<WorkflowDefinition[]>;
+  getPublishedSubworkflow(
+    userId: string,
+    workflowId: string,
+    parentWorkflowId?: string,
+  ): Promise<WorkflowDefinition | null>;
   updateWorkflow(
     userId: string,
     workflowId: string,
@@ -424,11 +296,105 @@ export interface Repository {
   deleteSnippet(userId: string, snippetId: string): Promise<void>;
 }
 
-class D1Repository implements Repository {
+class PgRepository implements Repository {
   private db;
+  private client;
 
-  constructor(env: WorkerEnv) {
-    this.db = drizzle(env.DB);
+  constructor(
+    db: Awaited<ReturnType<typeof createDb>>["db"],
+    client: Awaited<ReturnType<typeof createDb>>["client"],
+  ) {
+    this.db = db;
+    this.client = client;
+  }
+
+  private async listWorkflowRows(userId: string) {
+    return this.db
+      .select()
+      .from(workflowsTable)
+      .where(eq(workflowsTable.userId, userId))
+      .orderBy(desc(workflowsTable.updatedAt));
+  }
+
+  private dependencyTargets(graph: WorkflowGraph) {
+    return graph.nodes
+      .filter((node) => node.data.kind === "runSubworkflow")
+      .map((node) => String(node.data.config.workflowId ?? "").trim())
+      .filter(Boolean);
+  }
+
+  private async validateWorkflowDefinition(
+    userId: string,
+    workflowId: string,
+    mode: WorkflowMode,
+    parentWorkflowId: string | undefined,
+    graph: WorkflowGraph,
+  ) {
+    const validation = validateGraph(graph, mode);
+    if (!validation.valid) {
+      throw new Error(validation.issues.join(" "));
+    }
+
+    if (mode === "subworkflow" && !parentWorkflowId) {
+      throw new Error("Sub-workflows must belong to a parent workflow.");
+    }
+
+    const rows = await this.listWorkflowRows(userId);
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    const graphById = new Map<string, WorkflowGraph>(
+      rows.map((row) => [
+        row.id,
+        JSON.parse(row.draftGraphJson) as WorkflowGraph,
+      ]),
+    );
+    graphById.set(workflowId, graph);
+
+    for (const targetId of this.dependencyTargets(graph)) {
+      if (targetId === workflowId) {
+        throw new Error(
+          "A workflow cannot reference itself as a sub-workflow.",
+        );
+      }
+      const target = rowById.get(targetId);
+      if (!target) {
+        throw new Error("A referenced sub-workflow no longer exists.");
+      }
+      if ((target.mode ?? "standard") !== "subworkflow") {
+        throw new Error("Only dedicated sub-workflows can be referenced.");
+      }
+      if ((target.parentWorkflowId ?? undefined) !== workflowId) {
+        throw new Error(
+          "Sub-workflows are workflow-scoped and can only be used by their parent workflow.",
+        );
+      }
+      if (target.status !== "published") {
+        throw new Error(
+          "Parent workflows can only reference published sub-workflows.",
+        );
+      }
+    }
+
+    const visited = new Set<string>();
+    const visiting = new Set<string>();
+    const emptyGraph: WorkflowGraph = { nodes: [], edges: [] };
+    const hasCycle = (candidateId: string): boolean => {
+      if (visiting.has(candidateId)) return true;
+      if (visited.has(candidateId)) return false;
+      visiting.add(candidateId);
+      for (const nextId of this.dependencyTargets(
+        graphById.get(candidateId) ?? emptyGraph,
+      )) {
+        if (!graphById.has(nextId)) continue;
+        if (hasCycle(nextId)) return true;
+      }
+      visiting.delete(candidateId);
+      visited.add(candidateId);
+      return false;
+    };
+
+    if (hasCycle(workflowId)) {
+      throw new Error("Workflow dependency cycles are not allowed.");
+    }
   }
 
   private async loadRuns(userId: string, workflowId?: string) {
@@ -476,11 +442,7 @@ class D1Repository implements Repository {
 
   async listWorkflows(userId: string) {
     const [rows, runs] = await Promise.all([
-      this.db
-        .select()
-        .from(workflowsTable)
-        .where(eq(workflowsTable.userId, userId))
-        .orderBy(desc(workflowsTable.updatedAt)),
+      this.listWorkflowRows(userId),
       this.listRuns(userId),
     ]);
     return rows.map((row) => parseWorkflow(row, runs));
@@ -516,9 +478,25 @@ class D1Repository implements Repository {
     return row ? parseVersion(row) : null;
   }
 
-  async createWorkflow(userId: string, name: string) {
+  async createWorkflow(
+    userId: string,
+    name: string,
+    mode: WorkflowMode = "standard",
+    parentWorkflowId?: string,
+  ) {
     const now = new Date().toISOString();
     const id = createId("workflow");
+    if (mode === "subworkflow") {
+      if (!parentWorkflowId) {
+        throw new Error("A sub-workflow must belong to a parent workflow.");
+      }
+      const parent = await this.getWorkflow(userId, parentWorkflowId);
+      if (!parent || parent.mode !== "standard") {
+        throw new Error(
+          "Sub-workflows can only be created under a standard workflow.",
+        );
+      }
+    }
     await this.db.insert(workflowsTable).values({
       id,
       userId,
@@ -526,8 +504,14 @@ class D1Repository implements Repository {
       slug: workflowSlug(name),
       description:
         "Describe what this workflow orchestrates, the systems it listens to, and how it should respond.",
+      mode,
+      parentWorkflowId: parentWorkflowId ?? null,
       status: "draft",
-      draftGraphJson: JSON.stringify(createStarterGraph()),
+      draftGraphJson: JSON.stringify(
+        mode === "subworkflow"
+          ? createSubworkflowStarterGraph()
+          : createStarterGraph(),
+      ),
       publishedVersionId: null,
       lastPublishedAt: null,
       createdAt: now,
@@ -550,12 +534,20 @@ class D1Repository implements Repository {
     const name = patch.name ?? workflow.name;
     const description = patch.description ?? workflow.description;
     const graph = patch.draftGraph ?? workflow.draftGraph;
+    await this.validateWorkflowDefinition(
+      userId,
+      workflowId,
+      workflow.mode,
+      workflow.parentWorkflowId,
+      graph,
+    );
     await this.db
       .update(workflowsTable)
       .set({
         name,
         slug: workflowSlug(name),
         description,
+        parentWorkflowId: workflow.parentWorkflowId ?? null,
         draftGraphJson: JSON.stringify(graph),
         updatedAt: new Date().toISOString(),
       })
@@ -647,10 +639,13 @@ class D1Repository implements Repository {
   async publishWorkflow(userId: string, workflowId: string) {
     const workflow = await this.getWorkflow(userId, workflowId);
     if (!workflow) throw new Error("Workflow not found.");
-    const validation = validateGraph(workflow.draftGraph);
-    if (!validation.valid) {
-      throw new Error(validation.issues.join(" "));
-    }
+    await this.validateWorkflowDefinition(
+      userId,
+      workflowId,
+      workflow.mode,
+      workflow.parentWorkflowId,
+      workflow.draftGraph,
+    );
     const [lastVersion] = await this.db
       .select()
       .from(workflowVersionsTable)
@@ -735,6 +730,10 @@ class D1Repository implements Repository {
       finishedAt: run.finishedAt ?? null,
       durationMs: run.durationMs ?? null,
       workflowInstanceId: run.workflowInstanceId ?? null,
+      parentRunId: run.parentRunId ?? null,
+      parentStepId: run.parentStepId ?? null,
+      rootRunId: run.rootRunId ?? null,
+      runDepth: run.runDepth ?? 0,
     });
   }
 
@@ -753,6 +752,10 @@ class D1Repository implements Repository {
         finishedAt: next.finishedAt ?? null,
         durationMs: next.durationMs ?? null,
         workflowInstanceId: next.workflowInstanceId ?? null,
+        parentRunId: next.parentRunId ?? null,
+        parentStepId: next.parentStepId ?? null,
+        rootRunId: next.rootRunId ?? null,
+        runDepth: next.runDepth ?? 0,
       })
       .where(
         and(
@@ -1074,6 +1077,53 @@ class D1Repository implements Repository {
     }));
   }
 
+  async listSubworkflows(userId: string) {
+    const [rows, runs] = await Promise.all([
+      this.db
+        .select()
+        .from(workflowsTable)
+        .where(
+          and(
+            eq(workflowsTable.userId, userId),
+            eq(workflowsTable.mode, "subworkflow"),
+          ),
+        )
+        .orderBy(desc(workflowsTable.updatedAt)),
+      this.listRuns(userId),
+    ]);
+    return rows.map((row) => parseWorkflow(row, runs));
+  }
+
+  async getPublishedSubworkflow(
+    userId: string,
+    workflowId: string,
+    parentWorkflowId?: string,
+  ) {
+    const [row] = await this.db
+      .select()
+      .from(workflowsTable)
+      .where(
+        parentWorkflowId == null
+          ? and(
+              eq(workflowsTable.userId, userId),
+              eq(workflowsTable.id, workflowId),
+              eq(workflowsTable.mode, "subworkflow"),
+              eq(workflowsTable.status, "published"),
+            )
+          : and(
+              eq(workflowsTable.userId, userId),
+              eq(workflowsTable.id, workflowId),
+              eq(workflowsTable.mode, "subworkflow"),
+              eq(workflowsTable.status, "published"),
+              eq(workflowsTable.parentWorkflowId, parentWorkflowId),
+            ),
+      )
+      .limit(1);
+    if (!row) return null;
+    const runs = await this.listRuns(userId, workflowId);
+    return parseWorkflow(row, runs);
+  }
+
   async markScheduleDispatch(
     workflowId: string,
     triggerNodeId: string,
@@ -1141,6 +1191,10 @@ class D1Repository implements Repository {
         ),
       );
   }
+
+  async close() {
+    await this.client.end();
+  }
 }
 
 async function checksum(input: string) {
@@ -1152,6 +1206,6 @@ async function checksum(input: string) {
 }
 
 export async function createRepository(env: WorkerEnv): Promise<Repository> {
-  await ensureSchema(env);
-  return new D1Repository(env);
+  const { db, client } = await createDb(env);
+  return new PgRepository(db, client);
 }

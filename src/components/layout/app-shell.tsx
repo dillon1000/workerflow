@@ -22,7 +22,9 @@ export function AppShell() {
   const createWorkflow = useSetAtom(createWorkflowAtom);
   const performSignOut = useSetAtom(signOutAtom);
 
-  const isEditor = /^\/workflows\/[^/]+\/editor/.test(location.pathname);
+  const isEditor =
+    /^\/workflows\/[^/]+\/editor/.test(location.pathname) ||
+    /^\/workflows\/[^/]+\/subworkflow\/[^/]+\/editor/.test(location.pathname);
 
   return (
     <div className="page-reveal flex h-screen flex-col overflow-hidden bg-[color:var(--color-background)]">
@@ -32,9 +34,11 @@ export function AppShell() {
           to="/dashboard"
           className="flex h-full items-center gap-2 border-r border-[color:var(--color-border)] px-3"
         >
-          <span className="grid h-4 w-4 place-items-center bg-[color:var(--color-primary)] text-[10px] font-bold text-white">
-            W
-          </span>
+          <img
+            alt="Workerflow"
+            className="h-4 w-auto"
+            src="/workerflow-transparent.png"
+          />
           <span className="mono text-[12px] font-medium tracking-tight">
             workerflow
           </span>
@@ -74,10 +78,15 @@ export function AppShell() {
           <Button
             size="sm"
             variant="primary"
-            onClick={() => void createWorkflow("Untitled workflow")}
+            onClick={() =>
+              void createWorkflow({
+                name: "Untitled workflow",
+                mode: "standard",
+              })
+            }
           >
             <Plus className="h-3 w-3" />
-            New
+            Workflow
           </Button>
           <Button
             size="sm"

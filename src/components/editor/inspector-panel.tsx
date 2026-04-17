@@ -1,4 +1,5 @@
-import { Copy, Search, Trash2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Copy, Search, SquarePen, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ReferenceField } from "@/components/editor/reference-field";
@@ -21,13 +22,18 @@ import {
 import type {
   ConnectionDefinition,
   WorkflowDefinition,
+  WorkflowEdge,
   WorkflowNode,
 } from "@/lib/workflow/types";
 
 interface InspectorPanelProps {
   workflow: WorkflowDefinition;
+  parentWorkflow: WorkflowDefinition | null;
+  selectedEdge: WorkflowEdge | null;
   selectedNode: WorkflowNode | null;
   connections: ConnectionDefinition[];
+  workflows: WorkflowDefinition[];
+  onEdgeBranchChange: (value: "true" | "false") => void;
   onTitleChange: (value: string) => void;
   onSubtitleChange: (value: string) => void;
   onConfigChange: (key: string, value: unknown) => void;
@@ -36,8 +42,12 @@ interface InspectorPanelProps {
 
 export function InspectorPanel({
   workflow,
+  parentWorkflow,
+  selectedEdge,
   selectedNode,
   connections,
+  workflows,
+  onEdgeBranchChange,
   onTitleChange,
   onSubtitleChange,
   onConfigChange,
@@ -47,10 +57,18 @@ export function InspectorPanel({
   // (strict ancestors) can supply data to it.
   const availableReferences = useMemo(() => {
     if (!selectedNode) return [] as string[];
-    return getAncestorNodes(workflow.draftGraph, selectedNode.id).map(
-      (node) => `{{ ${node.data.title}.data }}`,
-    );
-  }, [selectedNode, workflow.draftGraph]);
+    const upstreamReferences = getAncestorNodes(
+      workflow.draftGraph,
+      selectedNode.id,
+    ).map((node) => `{{ ${node.data.title}.data }}`);
+    const parentReferences =
+      workflow.mode === "subworkflow" && parentWorkflow
+        ? parentWorkflow.draftGraph.nodes.map(
+            (node) => `{{ parent.${node.data.title}.data }}`,
+          )
+        : [];
+    return [...parentReferences, ...upstreamReferences];
+  }, [parentWorkflow, selectedNode, workflow.draftGraph, workflow.mode]);
 
   const [referenceQuery, setReferenceQuery] = useState("");
   const filteredReferences = useMemo(() => {
@@ -61,7 +79,7 @@ export function InspectorPanel({
     );
   }, [availableReferences, referenceQuery]);
 
-  if (!selectedNode) {
+  if (!selectedNode && !selectedEdge) {
     return (
       <aside className="flex h-full flex-col bg-[color:var(--color-card)]">
         <div className="hairline-b flex h-8 items-center px-3">
@@ -81,19 +99,96 @@ export function InspectorPanel({
     );
   }
 
-  const definition = getWorkflowNodeDefinition(selectedNode.data.kind);
+  if (selectedEdge) {
+    const sourceNode =
+      workflow.draftGraph.nodes.find(
+        (node) => node.id === selectedEdge.source,
+      ) ?? null;
+    const targetNode =
+      workflow.draftGraph.nodes.find(
+        (node) => node.id === selectedEdge.target,
+      ) ?? null;
+    const isConditionEdge = sourceNode?.data.kind === "condition";
+
+    return (
+      <aside className="flex h-full flex-col overflow-hidden bg-[color:var(--color-card)]">
+        <div className="hairline-b flex h-8 items-center gap-2 px-3">
+          <span className="label-xs">Inspector</span>
+          <span className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
+            / connection
+          </span>
+          <span className="mono ml-auto text-[10px] text-[color:var(--color-muted-foreground)]">
+            {selectedEdge.id.slice(0, 8)}
+          </span>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="hairline-b space-y-2.5 p-3">
+            <div>
+              <span className="label-xs">Path</span>
+              <p className="mt-1 text-[12px] text-[color:var(--color-foreground)]">
+                {sourceNode?.data.title ?? "Unknown node"} to{" "}
+                {targetNode?.data.title ?? "Unknown node"}
+              </p>
+            </div>
+            <p className="text-[11px] text-[color:var(--color-muted-foreground)]">
+              Conditional logic is stored on the connection leaving the block.
+            </p>
+          </div>
+
+          <div className="hairline-b p-3">
+            <div className="space-y-1">
+              <Label htmlFor="edge-branch">Branch</Label>
+              {isConditionEdge ? (
+                <Select
+                  onValueChange={(next) =>
+                    onEdgeBranchChange(next as "true" | "false")
+                  }
+                  value={String(selectedEdge.data?.branch ?? "")}
+                >
+                  <SelectTrigger id="edge-branch">
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">true</SelectItem>
+                    <SelectItem value="false">false</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mono hairline rounded-[3px] bg-[color:var(--color-surface)] p-2 text-[11px] text-[color:var(--color-muted-foreground)]">
+                  This connection runs on success.
+                </div>
+              )}
+              <p className="text-[11px] text-[color:var(--color-muted-foreground)]">
+                {isConditionEdge
+                  ? "Pick which result from the condition block should follow this path."
+                  : "Only condition blocks use true/false branching today."}
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
+  if (!selectedNode) {
+    return null;
+  }
+
+  const node = selectedNode;
+  const definition = getWorkflowNodeDefinition(node.data.kind);
   const configFields = definition?.fields ?? [];
 
   const webhookUrl =
-    selectedNode.data.kind === "webhook"
-      ? `${globalThis.location?.origin ?? ""}/api/triggers/webhook/${workflow.id}/${selectedNode.id}`
+    node.data.kind === "webhook"
+      ? `${globalThis.location?.origin ?? ""}/api/triggers/webhook/${workflow.id}/${node.id}`
       : null;
 
   const configIssues = Object.fromEntries(
     configFields
       .map((field) => [
         field.key,
-        validateNodeConfigField(field, selectedNode.data.config[field.key]),
+        validateNodeConfigField(field, node.data.config[field.key]),
       ])
       .filter(([, message]) => Boolean(message)),
   ) as Record<string, string>;
@@ -103,10 +198,10 @@ export function InspectorPanel({
       <div className="hairline-b flex h-8 items-center gap-2 px-3">
         <span className="label-xs">Inspector</span>
         <span className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
-          / {selectedNode.data.family}
+          / {node.data.family}
         </span>
         <span className="mono ml-auto text-[10px] text-[color:var(--color-muted-foreground)]">
-          {selectedNode.id.slice(0, 8)}
+          {node.id.slice(0, 8)}
         </span>
       </div>
 
@@ -117,7 +212,7 @@ export function InspectorPanel({
             <Input
               id="node-title"
               onChange={(event) => onTitleChange(event.target.value)}
-              value={selectedNode.data.title}
+              value={node.data.title}
             />
           </div>
           <div className="space-y-1">
@@ -126,7 +221,7 @@ export function InspectorPanel({
               id="node-subtitle"
               className="min-h-[52px]"
               onChange={(event) => onSubtitleChange(event.target.value)}
-              value={selectedNode.data.subtitle}
+              value={node.data.subtitle}
             />
           </div>
         </div>
@@ -142,12 +237,19 @@ export function InspectorPanel({
             </div>
             <div className="space-y-2">
               {configFields.map((field) => {
-                const value = selectedNode.data.config[field.key];
+                const value = node.data.config[field.key];
                 const error = configIssues[field.key];
                 const matchingConnections = connections.filter(
                   (connection) =>
                     !field.connectionProvider ||
                     connection.provider === field.connectionProvider,
+                );
+                const availableWorkflows = workflows.filter(
+                  (item) =>
+                    item.id !== workflow.id &&
+                    item.mode === "subworkflow" &&
+                    item.parentWorkflowId === workflow.id &&
+                    item.status === "published",
                 );
 
                 return (
@@ -201,6 +303,41 @@ export function InspectorPanel({
                           ))}
                         </SelectContent>
                       </Select>
+                    ) : field.kind === "workflow" ? (
+                      <div className="flex items-center gap-2">
+                        <Select
+                          onValueChange={(next) =>
+                            onConfigChange(field.key, next)
+                          }
+                          value={String(value ?? "")}
+                        >
+                          <SelectTrigger id={field.key}>
+                            <SelectValue placeholder="Select sub-workflow" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableWorkflows.map((item) => (
+                              <SelectItem key={item.id} value={item.id}>
+                                {item.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {String(value ?? "").trim() &&
+                        workflow.mode === "standard" ? (
+                          <Button asChild size="sm" variant="outline">
+                            <Link
+                              params={{
+                                parentWorkflowId: workflow.id,
+                                subworkflowId: String(value),
+                              }}
+                              to="/workflows/$parentWorkflowId/subworkflow/$subworkflowId/editor"
+                            >
+                              <SquarePen className="h-3 w-3" />
+                              Edit
+                            </Link>
+                          </Button>
+                        ) : null}
+                      </div>
                     ) : field.kind === "number" ? (
                       <Input
                         id={field.key}
@@ -361,7 +498,7 @@ export function InspectorPanel({
         )}
       </div>
 
-      {selectedNode.data.family !== "trigger" && (
+      {node.data.family !== "trigger" && (
         <div className="hairline-t p-2">
           <Button
             className="w-full"

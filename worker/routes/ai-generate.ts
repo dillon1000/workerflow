@@ -83,28 +83,33 @@ async function callOpenAICompatible(
   prompt: string,
   model: string,
 ) {
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetch(
+    `${baseUrl.replace(/\/$/, "")}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+      }),
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    }),
-  });
+  );
   const body = (await response.json()) as {
     choices?: { message?: { content?: string } }[];
     error?: { message?: string };
   };
   if (!response.ok) {
-    throw new Error(body.error?.message ?? `Provider error ${response.status}.`);
+    throw new Error(
+      body.error?.message ?? `Provider error ${response.status}.`,
+    );
   }
   return body.choices?.[0]?.message?.content ?? "";
 }
@@ -134,11 +139,11 @@ async function callAnthropic(
     error?: { message?: string };
   };
   if (!response.ok) {
-    throw new Error(body.error?.message ?? `Anthropic error ${response.status}.`);
+    throw new Error(
+      body.error?.message ?? `Anthropic error ${response.status}.`,
+    );
   }
-  return (
-    body.content?.find((part) => part.type === "text")?.text ?? ""
-  );
+  return body.content?.find((part) => part.type === "text")?.text ?? "";
 }
 
 export function mountAiGenerateRoutes(app: Hono<{ Bindings: WorkerEnv }>) {
@@ -160,7 +165,10 @@ export function mountAiGenerateRoutes(app: Hono<{ Bindings: WorkerEnv }>) {
       "apiKey",
     );
     if (!apiKey) {
-      return c.json({ message: "Connection is missing an apiKey secret." }, 400);
+      return c.json(
+        { message: "Connection is missing an apiKey secret." },
+        400,
+      );
     }
 
     const system = buildSystemPrompt();

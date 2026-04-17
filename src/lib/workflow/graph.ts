@@ -19,6 +19,7 @@ import type {
   WorkflowEdge,
   WorkflowEdgeData,
   WorkflowGraph,
+  WorkflowMode,
   WorkflowNode,
   WorkflowNodeData,
   WorkflowNodeKind,
@@ -90,6 +91,26 @@ export function createStarterGraph(): WorkflowGraph {
   };
 }
 
+export function createSubworkflowStarterGraph(): WorkflowGraph {
+  const trigger = createNode("parentContext", { x: 80, y: 180 });
+  const transform = createNode("transformJson", { x: 360, y: 160 });
+  const end = createNode("endRun", { x: 680, y: 160 });
+
+  transform.data.title = "Parent input";
+  transform.data.subtitle = "Shape parent workflow data for downstream steps.";
+  transform.data.config.template = '{"input":"{{ trigger.data }}"}';
+  end.data.title = "Return result";
+  end.data.config.reason = "Sub-workflow complete";
+
+  return {
+    nodes: [trigger, transform, end],
+    edges: [
+      createEdge(trigger.id, transform.id),
+      createEdge(transform.id, end.id),
+    ],
+  };
+}
+
 export function normalizeGraph(graph?: WorkflowGraph): WorkflowGraph {
   const fallback = createStarterGraph();
   if (!graph) return fallback;
@@ -99,15 +120,36 @@ export function normalizeGraph(graph?: WorkflowGraph): WorkflowGraph {
   return { nodes, edges };
 }
 
-export function validateGraph(graph: WorkflowGraph): GraphValidationResult {
+export function validateGraph(
+  graph: WorkflowGraph,
+  mode: WorkflowMode = "standard",
+): GraphValidationResult {
   const issues: string[] = [];
   const nodeIssues: Record<string, NodeConfigValidationIssue[]> = {};
   const triggerNodes = graph.nodes.filter(
     (node) => node.data.family === "trigger",
   );
+  const parentContextTriggers = triggerNodes.filter(
+    (node) => node.data.kind === "parentContext",
+  );
 
-  if (triggerNodes.length !== 1) {
+  if (mode === "subworkflow") {
+    if (triggerNodes.length !== 1 || parentContextTriggers.length !== 1) {
+      issues.push(
+        'A sub-workflow must have exactly one "Context from parent workflow" trigger.',
+      );
+    }
+    if (triggerNodes.some((node) => node.data.kind !== "parentContext")) {
+      issues.push(
+        "Sub-workflows cannot use button, webhook, or schedule triggers.",
+      );
+    }
+  } else if (triggerNodes.length !== 1) {
     issues.push("A workflow must have exactly one trigger node.");
+  } else if (parentContextTriggers.length > 0) {
+    issues.push(
+      'Only sub-workflows can use the "Context from parent workflow" trigger.',
+    );
   }
 
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
@@ -209,7 +251,8 @@ export function validateGraph(graph: WorkflowGraph): GraphValidationResult {
     valid: issues.length === 0,
     issues: Array.from(new Set(issues)),
     nodeIssues,
-    triggerNode: triggerNodes[0],
+    triggerNode:
+      mode === "subworkflow" ? parentContextTriggers[0] : triggerNodes[0],
   };
 }
 
@@ -223,6 +266,10 @@ export function nodeReferenceName(node: WorkflowNode) {
 
 export function hasTriggerNode(graph: WorkflowGraph) {
   return graph.nodes.some((node) => node.data.family === "trigger");
+}
+
+export function isSystemTriggerNode(node: WorkflowNode) {
+  return node.data.kind === "parentContext";
 }
 
 /**
@@ -319,11 +366,20 @@ export function applyGraphEdgeChanges(
 }
 
 export function connectGraph(graph: WorkflowGraph, connection: Connection) {
+  return connectGraphWithData(graph, connection);
+}
+
+export function connectGraphWithData(
+  graph: WorkflowGraph,
+  connection: Connection,
+  data?: WorkflowEdgeData,
+) {
   const nextEdges = addEdge(
     {
       ...connection,
       id: createId("edge"),
       type: "smoothstep",
+      data,
     },
     graph.edges as Edge[],
   );
@@ -338,6 +394,37 @@ export function connectGraph(graph: WorkflowGraph, connection: Connection) {
       data: edge.data as WorkflowEdgeData | undefined,
     })),
   };
+}
+
+export function getSelectedEdge(graph: WorkflowGraph, edgeId?: string | null) {
+  return graph.edges.find((edge) => edge.id === edgeId) ?? null;
+}
+
+export function updateEdge(
+  graph: WorkflowGraph,
+  edgeId: string,
+  updater: (edge: WorkflowEdge) => WorkflowEdge,
+) {
+  return {
+    ...graph,
+    edges: graph.edges.map((edge) =>
+      edge.id === edgeId ? updater(edge) : edge,
+    ),
+  };
+}
+
+export function updateEdgeData(
+  graph: WorkflowGraph,
+  edgeId: string,
+  data: WorkflowEdgeData,
+) {
+  return updateEdge(graph, edgeId, (edge) => ({
+    ...edge,
+    data: {
+      ...(edge.data ?? {}),
+      ...data,
+    },
+  }));
 }
 
 export function getSelectedNode(graph: WorkflowGraph, nodeId?: string | null) {

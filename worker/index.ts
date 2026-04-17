@@ -20,9 +20,13 @@ mountSnippetRoutes(app);
 mountAiGenerateRoutes(app);
 
 app.all("/api/auth/*", async (c) => {
-  const { auth, ready } = createAuth(c.env, c.req.raw);
-  await ready;
-  return auth.handler(c.req.raw);
+  const { auth, ready, close } = await createAuth(c.env, c.req.raw);
+  try {
+    await ready;
+    return await auth.handler(c.req.raw);
+  } finally {
+    c.executionCtx.waitUntil(close());
+  }
 });
 
 app.onError((error, c) => {

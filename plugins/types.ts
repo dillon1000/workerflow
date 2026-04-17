@@ -30,7 +30,8 @@ export type WorkflowNodeFieldKind =
   | "number"
   | "json"
   | "select"
-  | "connection";
+  | "connection"
+  | "workflow";
 
 export interface WorkflowNodeFieldOption {
   label: string;

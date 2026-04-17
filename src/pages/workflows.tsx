@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useAtomValue, useSetAtom } from "jotai";
-import { Plus } from "lucide-react";
+import { GitBranch, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,11 +9,164 @@ import {
   selectWorkflowAtom,
 } from "@/state/app-state";
 import { formatRelativeTime } from "@/lib/utils";
+import type { WorkflowDefinition } from "@/lib/workflow/types";
+
+function SubworkflowRow({
+  parent,
+  workflow,
+  index,
+  selectWorkflow,
+}: {
+  parent: WorkflowDefinition;
+  workflow: WorkflowDefinition;
+  index: number;
+  selectWorkflow: (workflowId: string) => void;
+}) {
+  return (
+    <div className="ml-[92px] grid items-center gap-3 border-l border-[color:var(--color-border)] px-3 py-2 pl-5 hover:bg-[color:var(--color-surface)]">
+      <div
+        className="grid items-center gap-3"
+        style={{ gridTemplateColumns: "80px minmax(0,1fr) 100px 90px" }}
+      >
+        <div className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
+          {`${index + 1}`.padStart(2, "0")}
+        </div>
+        <Link
+          className="flex min-w-0 items-start gap-2"
+          onClick={() => selectWorkflow(workflow.id)}
+          params={{
+            parentWorkflowId: parent.id,
+            subworkflowId: workflow.id,
+          }}
+          to="/workflows/$parentWorkflowId/subworkflow/$subworkflowId/editor"
+        >
+          <div className="mt-0.5 flex shrink-0 items-center gap-1 text-[color:var(--color-muted-foreground)]">
+            <GitBranch className="h-3 w-3" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[13px] font-medium text-[color:var(--color-foreground)]">
+              {workflow.name}
+            </div>
+            <div className="truncate text-[11px] text-[color:var(--color-muted-foreground)]">
+              {workflow.description}
+            </div>
+          </div>
+        </Link>
+        <div>
+          <Badge
+            variant={workflow.status === "published" ? "success" : "muted"}
+          >
+            {workflow.status}
+          </Badge>
+        </div>
+        <div className="mono text-right text-[11px] text-[color:var(--color-muted-foreground)]">
+          {formatRelativeTime(workflow.updatedAt)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowRow({
+  workflow,
+  subworkflows,
+  index,
+  selectWorkflow,
+  createWorkflow,
+}: {
+  workflow: WorkflowDefinition;
+  subworkflows: WorkflowDefinition[];
+  index: number;
+  selectWorkflow: (workflowId: string) => void;
+  createWorkflow: (
+    payload:
+      | string
+      | {
+          name: string;
+          mode?: "standard" | "subworkflow";
+          parentWorkflowId?: string;
+        },
+  ) => Promise<unknown>;
+}) {
+  return (
+    <div className="hairline-b">
+      <div
+        className="grid items-center gap-3 px-3 py-2 hover:bg-[color:var(--color-surface)]"
+        style={{ gridTemplateColumns: "80px minmax(0,1fr) 120px 110px 90px" }}
+      >
+        <div className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
+          {String(index + 1).padStart(2, "0")}
+        </div>
+        <Link
+          className="min-w-0"
+          onClick={() => selectWorkflow(workflow.id)}
+          params={{ workflowId: workflow.id }}
+          to="/workflows/$workflowId/editor"
+        >
+          <div className="text-[13px] font-medium text-[color:var(--color-foreground)]">
+            {workflow.name}
+          </div>
+          <div className="truncate text-[11px] text-[color:var(--color-muted-foreground)]">
+            {workflow.description}
+          </div>
+        </Link>
+        <div className="flex items-center gap-2">
+          <Badge
+            variant={workflow.status === "published" ? "success" : "muted"}
+          >
+            {workflow.status}
+          </Badge>
+          <Badge variant="muted">{workflow.mode}</Badge>
+        </div>
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              void createWorkflow({
+                name: `${workflow.name} sub-workflow`,
+                mode: "subworkflow",
+                parentWorkflowId: workflow.id,
+              })
+            }
+          >
+            <Plus className="h-3 w-3" />
+            Sub-workflow
+          </Button>
+        </div>
+        <div className="mono text-right text-[11px] text-[color:var(--color-muted-foreground)]">
+          {formatRelativeTime(workflow.updatedAt)}
+        </div>
+      </div>
+      {subworkflows.map((subworkflow, subIndex) => (
+        <SubworkflowRow
+          key={subworkflow.id}
+          index={subIndex}
+          parent={workflow}
+          selectWorkflow={selectWorkflow}
+          workflow={subworkflow}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function WorkflowsPage() {
   const state = useAtomValue(appStateAtom);
   const createWorkflow = useSetAtom(createWorkflowAtom);
   const selectWorkflow = useSetAtom(selectWorkflowAtom);
+
+  const parentWorkflows = state.workflows.filter(
+    (workflow) => workflow.mode === "standard",
+  );
+  const subworkflowsByParent = new Map<string, WorkflowDefinition[]>();
+  for (const workflow of state.workflows) {
+    if (workflow.mode !== "subworkflow" || !workflow.parentWorkflowId) continue;
+    subworkflowsByParent.set(workflow.parentWorkflowId, [
+      ...(subworkflowsByParent.get(workflow.parentWorkflowId) ?? []),
+      workflow,
+    ]);
+  }
 
   return (
     <div className="mx-auto flex h-full max-w-[1400px] flex-col">
@@ -23,90 +176,49 @@ export function WorkflowsPage() {
           Registry
         </h1>
         <span className="mono ml-auto text-[11px] text-[color:var(--color-muted-foreground)]">
-          {state.workflows.length} total
+          {parentWorkflows.length} workflows
         </span>
         <Button
           size="sm"
           variant="primary"
-          onClick={() => void createWorkflow("Untitled workflow")}
+          onClick={() =>
+            void createWorkflow({ name: "Untitled workflow", mode: "standard" })
+          }
         >
           <Plus className="h-3 w-3" />
-          New
+          New workflow
         </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full">
-          <thead className="sticky top-0 z-10">
-            <tr className="hairline-b bg-[color:var(--color-surface)]">
-              <th className="label-xs w-8 px-3 py-1.5 text-left">#</th>
-              <th className="label-xs px-3 py-1.5 text-left">name</th>
-              <th className="label-xs px-3 py-1.5 text-left">status</th>
-              <th className="label-xs px-3 py-1.5 text-left">triggers</th>
-              <th className="label-xs px-3 py-1.5 text-right">runs</th>
-              <th className="label-xs px-3 py-1.5 text-right">success</th>
-              <th className="label-xs px-3 py-1.5 text-right">updated</th>
-            </tr>
-          </thead>
-          <tbody className="stagger">
-            {state.workflows.map((workflow, i) => (
-              <tr
-                key={workflow.id}
-                className="hairline-b group cursor-pointer hover:bg-[color:var(--color-surface)]"
-              >
-                <td className="mono px-3 py-2 text-[11px] text-[color:var(--color-muted-foreground)]">
-                  {String(i + 1).padStart(2, "0")}
-                </td>
-                <td className="px-3 py-2">
-                  <Link
-                    className="block"
-                    onClick={() => selectWorkflow(workflow.id)}
-                    params={{ workflowId: workflow.id }}
-                    to="/workflows/$workflowId/editor"
-                  >
-                    <div className="text-[13px] font-medium group-hover:text-[color:var(--color-primary)]">
-                      {workflow.name}
-                    </div>
-                    <div className="mt-0.5 truncate text-[11px] text-[color:var(--color-muted-foreground)]">
-                      {workflow.description}
-                    </div>
-                  </Link>
-                </td>
-                <td className="px-3 py-2">
-                  <Badge
-                    variant={
-                      workflow.status === "published" ? "success" : "muted"
-                    }
-                  >
-                    {workflow.status}
-                  </Badge>
-                </td>
-                <td className="mono px-3 py-2 text-[11px] text-[color:var(--color-muted-foreground)]">
-                  {workflow.metrics.activeTriggers.join(", ") || "manual"}
-                </td>
-                <td className="mono px-3 py-2 text-right text-[12px] tabular-nums">
-                  {workflow.metrics.totalRuns}
-                </td>
-                <td className="mono px-3 py-2 text-right text-[12px] tabular-nums">
-                  {workflow.metrics.successRate}%
-                </td>
-                <td className="mono px-3 py-2 text-right text-[11px] text-[color:var(--color-muted-foreground)]">
-                  {formatRelativeTime(workflow.updatedAt)}
-                </td>
-              </tr>
-            ))}
-            {state.workflows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-3 py-16 text-center text-[12px] text-[color:var(--color-muted-foreground)]"
-                >
-                  No workflows yet — create one to begin.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <div
+          className="sticky top-0 z-10 grid gap-3 bg-[color:var(--color-surface)] px-3 py-1.5"
+          style={{ gridTemplateColumns: "80px minmax(0,1fr) 120px 110px 90px" }}
+        >
+          <div className="label-xs">#</div>
+          <div className="label-xs">workflow</div>
+          <div className="label-xs">status</div>
+          <div className="label-xs text-right">actions</div>
+          <div className="label-xs text-right">updated</div>
+        </div>
+
+        <div className="stagger">
+          {parentWorkflows.map((workflow, index) => (
+            <WorkflowRow
+              key={workflow.id}
+              createWorkflow={createWorkflow}
+              index={index}
+              selectWorkflow={selectWorkflow}
+              subworkflows={subworkflowsByParent.get(workflow.id) ?? []}
+              workflow={workflow}
+            />
+          ))}
+          {parentWorkflows.length === 0 ? (
+            <div className="px-3 py-16 text-center text-[12px] text-[color:var(--color-muted-foreground)]">
+              No workflows yet — create one to begin.
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

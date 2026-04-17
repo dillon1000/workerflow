@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   currentWorkflowAtom,
+  selectedEdgeAtomValue,
   selectedNodeAtomValue,
   appStateAtom,
   activeRunAtom,
@@ -32,9 +33,11 @@ import {
   runCurrentWorkflowAtom,
   saveCurrentWorkflowAtom,
   saveWorkflowMetaAtom,
+  selectEdgeAtom,
   selectNodeAtom,
   selectWorkflowAtom,
   setRightPanelTabAtom,
+  updateSelectedEdgeBranchAtom,
   updateSelectedNodeConfigAtom,
   updateSelectedNodeSubtitleAtom,
   updateSelectedNodeTitleAtom,
@@ -79,9 +82,16 @@ function WorkflowNameInput({
 }
 
 export function WorkflowEditorPage() {
-  const { workflowId } = useParams({ strict: false }) as { workflowId: string };
+  const params = useParams({ strict: false }) as {
+    workflowId?: string;
+    parentWorkflowId?: string;
+    subworkflowId?: string;
+  };
+  const workflowId = params.subworkflowId ?? params.workflowId ?? "";
+  const parentWorkflowId = params.parentWorkflowId;
   const selectWorkflow = useSetAtom(selectWorkflowAtom);
   const selectNode = useSetAtom(selectNodeAtom);
+  const selectEdge = useSetAtom(selectEdgeAtom);
   const addNode = useSetAtom(addNodeAtom);
   const onNodesChange = useSetAtom(applyNodeChangesAtom);
   const onEdgesChange = useSetAtom(applyEdgeChangesAtom);
@@ -92,14 +102,21 @@ export function WorkflowEditorPage() {
   const updateTitle = useSetAtom(updateSelectedNodeTitleAtom);
   const updateSubtitle = useSetAtom(updateSelectedNodeSubtitleAtom);
   const updateConfig = useSetAtom(updateSelectedNodeConfigAtom);
+  const updateEdgeBranch = useSetAtom(updateSelectedEdgeBranchAtom);
   const removeSelectedNode = useSetAtom(removeSelectedNodeAtom);
   const refreshRuns = useSetAtom(refreshRunsAtom);
   const saveMeta = useSetAtom(saveWorkflowMetaAtom);
   const workflow = useAtomValue(currentWorkflowAtom);
+  const selectedEdge = useAtomValue(selectedEdgeAtomValue);
   const selectedNode = useAtomValue(selectedNodeAtomValue);
   const state = useAtomValue(appStateAtom);
   const activeRun = useAtomValue(activeRunAtom);
   const setRightPanelTab = useSetAtom(setRightPanelTabAtom);
+  const parentWorkflow =
+    parentWorkflowId == null
+      ? null
+      : (state.workflows.find((item) => item.id === parentWorkflowId) ?? null);
+
   useEffect(() => {
     selectWorkflow(workflowId);
     void refreshRuns(workflowId);
@@ -116,6 +133,7 @@ export function WorkflowEditorPage() {
         <Badge variant={workflow.status === "published" ? "success" : "muted"}>
           {workflow.status}
         </Badge>
+        <Badge variant="muted">{workflow.mode}</Badge>
         <WorkflowNameInput
           key={workflow.id}
           initial={workflow.name}
@@ -144,6 +162,12 @@ export function WorkflowEditorPage() {
         <span className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
           · {workflow.draftGraph.nodes.length} nodes
         </span>
+        {workflow.mode === "subworkflow" ? (
+          <span className="rounded-[3px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-2 py-1 text-[11px] text-[color:var(--color-muted-foreground)]">
+            You are editing a sub-workflow
+            {parentWorkflow ? ` from ${parentWorkflow.name}` : ""}
+          </span>
+        ) : null}
         <div className="ml-auto flex items-center gap-1">
           <Button
             size="sm"
@@ -168,14 +192,16 @@ export function WorkflowEditorPage() {
             <UploadCloud className="h-3 w-3" />
             Publish
           </Button>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => void runWorkflow()}
-          >
-            <Play className="h-3 w-3" />
-            Run
-          </Button>
+          {workflow.mode === "standard" ? (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => void runWorkflow()}
+            >
+              <Play className="h-3 w-3" />
+              Run
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -192,9 +218,11 @@ export function WorkflowEditorPage() {
         <div className="min-w-0 flex-1">
           <WorkflowCanvas
             graph={workflow.draftGraph}
+            selectedEdgeId={state.selectedEdgeId}
             selectedNodeId={state.selectedNodeId}
             onConnect={(connection) => onConnect({ workflowId, connection })}
             onEdgesChange={(changes) => onEdgesChange({ workflowId, changes })}
+            onEdgeClick={selectEdge}
             onNodeClick={selectNode}
             onNodesChange={(changes) => onNodesChange({ workflowId, changes })}
           />
@@ -223,10 +251,14 @@ export function WorkflowEditorPage() {
               <InspectorPanel
                 connections={state.connections}
                 onConfigChange={(key, value) => updateConfig({ key, value })}
+                onEdgeBranchChange={updateEdgeBranch}
                 onDeleteNode={() => removeSelectedNode(workflowId)}
                 onSubtitleChange={updateSubtitle}
                 onTitleChange={updateTitle}
+                parentWorkflow={parentWorkflow}
+                selectedEdge={selectedEdge}
                 selectedNode={selectedNode}
+                workflows={state.workflows}
                 workflow={workflow}
               />
             </TabsContent>

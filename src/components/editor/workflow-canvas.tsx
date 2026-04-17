@@ -43,7 +43,9 @@ function decorateEdge(edge: Edge): Edge {
 
 interface WorkflowCanvasProps {
   graph: WorkflowGraph;
+  selectedEdgeId: string | null;
   selectedNodeId: string | null;
+  onEdgeClick: (edgeId: string | null) => void;
   onNodeClick: (nodeId: string | null) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -52,7 +54,9 @@ interface WorkflowCanvasProps {
 
 function InnerCanvas({
   graph,
+  selectedEdgeId,
   selectedNodeId,
+  onEdgeClick,
   onNodeClick,
   onNodesChange,
   onEdgesChange,
@@ -65,7 +69,10 @@ function InnerCanvas({
     })),
   );
   const [edges, setEdges, handleEdgesChange] = useEdgesState<Edge>(
-    graph.edges.map((edge) => decorateEdge(edge as Edge)),
+    graph.edges.map((edge) => ({
+      ...decorateEdge(edge as Edge),
+      selected: edge.id === selectedEdgeId,
+    })),
   );
 
   // Signature that excludes positions so local drags don't retrigger sync.
@@ -124,8 +131,23 @@ function InnerCanvas({
   useEffect(() => {
     if (lastEdgeSignatureRef.current === edgeSignature) return;
     lastEdgeSignatureRef.current = edgeSignature;
-    setEdges(graph.edges.map((edge) => decorateEdge(edge as Edge)));
-  }, [edgeSignature, graph.edges, setEdges]);
+    setEdges(
+      graph.edges.map((edge) => ({
+        ...decorateEdge(edge as Edge),
+        selected: edge.id === selectedEdgeId,
+      })),
+    );
+  }, [edgeSignature, graph.edges, selectedEdgeId, setEdges]);
+
+  useEffect(() => {
+    setEdges((current) =>
+      current.map((edge) =>
+        edge.selected === (edge.id === selectedEdgeId)
+          ? edge
+          : { ...edge, selected: edge.id === selectedEdgeId },
+      ),
+    );
+  }, [selectedEdgeId, setEdges]);
 
   function handleCanvasNodesChange(changes: NodeChange[]) {
     handleNodesChange(changes);
@@ -168,7 +190,11 @@ function InnerCanvas({
         onNodesChange={handleCanvasNodesChange}
         onEdgesChange={handleCanvasEdgesChange}
         onConnect={onConnect}
-        onPaneClick={() => onNodeClick(null)}
+        onPaneClick={() => {
+          onNodeClick(null);
+          onEdgeClick(null);
+        }}
+        onEdgeClick={(_event, edge) => onEdgeClick(edge.id)}
         onNodeClick={(_event, node) => onNodeClick(node.id)}
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={deleteKeys}

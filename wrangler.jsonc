@@ -18,11 +18,10 @@
   },
   "upload_source_maps": true,
   "compatibility_flags": ["nodejs_compat"],
-  "d1_databases": [
+  "hyperdrive": [
     {
-      "binding": "DB",
-      "database_name": "workerflow",
-      "database_id": "28f5866d-eae0-4dde-82d4-9614e2c247cd",
+      "binding": "HYPERDRIVE",
+      "id": "c84afd060b3843c5857a7f1b7c89765c",
     },
   ],
   "kv_namespaces": [
