@@ -773,12 +773,16 @@ export class PgRepository implements Repository {
       .where(eq(workflowsTable.status, "published"))
       .orderBy(desc(workflowsTable.updatedAt));
 
-    const byUser = new Map<string, WorkflowRun[]>();
-    for (const row of rows) {
-      if (!byUser.has(row.userId)) {
-        byUser.set(row.userId, await this.listRuns(row.userId));
-      }
-    }
+    const userIds = [...new Set(rows.map((row) => row.userId))];
+    const runsByUser = await Promise.all(
+      userIds.map(
+        async (userId): Promise<readonly [string, WorkflowRun[]]> => [
+          userId,
+          await this.listRuns(userId),
+        ],
+      ),
+    );
+    const byUser = new Map<string, WorkflowRun[]>(runsByUser);
 
     return rows.map((row) => ({
       userId: row.userId,
