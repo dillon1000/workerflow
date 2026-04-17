@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
+  ChevronRight,
   Download,
+  GitBranch,
   Play,
   Save,
   Settings2,
@@ -133,12 +135,34 @@ export function WorkflowEditorPage() {
         <Badge variant={workflow.status === "published" ? "success" : "muted"}>
           {workflow.status}
         </Badge>
-        <Badge variant="muted">{workflow.mode}</Badge>
-        <WorkflowNameInput
-          key={workflow.id}
-          initial={workflow.name}
-          onCommit={(next) => saveMeta({ workflowId: workflow.id, name: next })}
-        />
+        <div className="flex min-w-0 items-center">
+          {workflow.mode === "subworkflow" && parentWorkflow ? (
+            <>
+              <Link
+                to="/workflows/$workflowId/editor"
+                params={{ workflowId: parentWorkflow.id } as never}
+                className="mono flex h-7 max-w-[200px] items-center gap-1 truncate rounded-[3px] px-1 text-[13px] text-[color:var(--color-muted-foreground)] hover:bg-[color:var(--color-surface)] hover:text-[color:var(--color-foreground)]"
+                title={`Parent workflow: ${parentWorkflow.name}`}
+              >
+                <span className="truncate">{parentWorkflow.name}</span>
+              </Link>
+              <ChevronRight className="h-3 w-3 shrink-0 text-[color:var(--color-muted-foreground)]" />
+              <GitBranch className="ml-1 h-3 w-3 shrink-0 text-[color:var(--color-muted-foreground)]" />
+            </>
+          ) : null}
+          <WorkflowNameInput
+            key={workflow.id}
+            initial={workflow.name}
+            onCommit={(next) =>
+              saveMeta({ workflowId: workflow.id, name: next })
+            }
+          />
+        </div>
+        <span className="hairline-l h-4" />
+        <span className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
+          {workflow.draftGraph.nodes.length} nodes · updated{" "}
+          {formatRelativeTime(workflow.updatedAt)}
+        </span>
         <span className="hairline-l h-4" />
         <Link
           to="/workflows/$workflowId/runs"
@@ -156,18 +180,6 @@ export function WorkflowEditorPage() {
           <Settings2 className="h-3 w-3" />
           settings
         </Link>
-        <span className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
-          · updated {formatRelativeTime(workflow.updatedAt)}
-        </span>
-        <span className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
-          · {workflow.draftGraph.nodes.length} nodes
-        </span>
-        {workflow.mode === "subworkflow" ? (
-          <span className="rounded-[3px] border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-2 py-1 text-[11px] text-[color:var(--color-muted-foreground)]">
-            You are editing a sub-workflow
-            {parentWorkflow ? ` from ${parentWorkflow.name}` : ""}
-          </span>
-        ) : null}
         <div className="ml-auto flex items-center gap-1">
           <Button
             size="sm"

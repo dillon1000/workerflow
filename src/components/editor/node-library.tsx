@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { templatesByFamily } from "@/lib/workflow/templates";
 import type { WorkflowNodeKind } from "@/lib/workflow/types";
@@ -16,7 +16,9 @@ export function NodeLibrary({
   workflowMode = "standard",
 }: NodeLibraryProps) {
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const sections = templatesByFamily();
+  const isSearching = query.trim().length > 0;
 
   return (
     <aside className="flex h-full flex-col bg-[color:var(--color-card)]">
@@ -53,11 +55,32 @@ export function NodeLibrary({
 
           if (visible.length === 0) return null;
 
+          const isCollapsed = !isSearching && collapsed[family] === true;
+
           return (
             <section key={family}>
-              <div className="hairline-b bg-[color:var(--color-surface)] px-3 py-1">
+              <button
+                type="button"
+                onClick={() =>
+                  setCollapsed((prev) => ({
+                    ...prev,
+                    [family]: !(prev[family] ?? false),
+                  }))
+                }
+                aria-expanded={!isCollapsed}
+                className="hairline-b flex w-full items-center justify-between gap-2 bg-[color:var(--color-surface)] px-3 py-1 text-left hover:bg-[color:var(--color-card)]"
+              >
                 <p className="label-xs">{family}</p>
-              </div>
+                <span className="flex items-center gap-1.5">
+                  <span className="mono text-[10px] text-[color:var(--color-muted-foreground)]">
+                    {visible.length}
+                  </span>
+                  <ChevronDown
+                    className={`h-3 w-3 text-[color:var(--color-muted-foreground)] transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                  />
+                </span>
+              </button>
+              {isCollapsed ? null : (
               <ul>
                 {visible.map((template) => {
                   const disabled = hasTrigger && template.family === "trigger";
@@ -87,6 +110,7 @@ export function NodeLibrary({
                   );
                 })}
               </ul>
+              )}
             </section>
           );
         })}
