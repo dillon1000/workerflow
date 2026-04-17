@@ -46,7 +46,39 @@ import {
   removeSelectedNodeAtom,
 } from "@/state/app-state";
 import { hasTriggerNode } from "@/lib/workflow/graph";
+import type { WorkflowGraph } from "@/lib/workflow/types";
 import { formatRelativeTime } from "@/lib/utils";
+
+const SELECTED_NODE_HASH_KEY = "selectedNode";
+
+function parseSelectedNodeHash(hash: string): string | null {
+  const match = hash.match(/^#selectedNode=(?::)?(.+)$/);
+  if (!match) return null;
+  const rawNodeId = match[1]?.trim();
+  if (!rawNodeId) return null;
+  try {
+    return decodeURIComponent(rawNodeId);
+  } catch {
+    return rawNodeId;
+  }
+}
+
+function hasNode(
+  graph: WorkflowGraph,
+  nodeId: string | null,
+): nodeId is string {
+  return Boolean(nodeId && graph.nodes.some((node) => node.id === nodeId));
+}
+
+function updateSelectedNodeHash(nodeId: string | null) {
+  if (typeof window === "undefined") return;
+  const nextHash = nodeId
+    ? `#${SELECTED_NODE_HASH_KEY}=:${encodeURIComponent(nodeId)}`
+    : "";
+  if (window.location.hash === nextHash) return;
+  const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
+  window.history.replaceState(window.history.state, "", nextUrl);
+}
 
 function WorkflowNameInput({
   initial,
@@ -123,6 +155,42 @@ export function WorkflowEditorPage() {
     selectWorkflow(workflowId);
     void refreshRuns(workflowId);
   }, [refreshRuns, selectWorkflow, workflowId]);
+
+  useEffect(() => {
+    if (!workflow) return;
+
+    const syncSelectionFromHash = (shouldClearWhenMissing: boolean) => {
+      const hashedNodeId = parseSelectedNodeHash(window.location.hash);
+      if (hasNode(workflow.draftGraph, hashedNodeId)) {
+        selectNode(hashedNodeId);
+        return;
+      }
+
+      if (window.location.hash.startsWith(`#${SELECTED_NODE_HASH_KEY}=`)) {
+        updateSelectedNodeHash(null);
+        selectNode(null);
+        return;
+      }
+
+      if (shouldClearWhenMissing) {
+        selectNode(null);
+      }
+    };
+
+    syncSelectionFromHash(false);
+    const handleHashChange = () => syncSelectionFromHash(true);
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [selectNode, workflow]);
+
+  useEffect(() => {
+    if (!workflow) return;
+    if (hasNode(workflow.draftGraph, state.selectedNodeId)) {
+      updateSelectedNodeHash(state.selectedNodeId);
+      return;
+    }
+    updateSelectedNodeHash(null);
+  }, [state.selectedNodeId, workflow]);
 
   if (!workflow) {
     return null;
