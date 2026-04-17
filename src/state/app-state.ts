@@ -633,24 +633,33 @@ export const runCurrentWorkflowAtom = atom(
   },
 );
 
-export const deleteCurrentWorkflowAtom = atom(null, async (get, set) => {
-  const workflowId = get(appStateAtom).selectedWorkflowId;
-  if (!workflowId) return;
-  await deleteWorkflow(workflowId);
-  set(appStateAtom, (current) => {
-    const workflows = current.workflows.filter(
-      (workflow) => workflow.id !== workflowId,
-    );
-    return {
-      ...current,
-      workflows,
-      selectedWorkflowId: workflows[0]?.id ?? null,
-      selectedNodeId: null,
-      selectedEdgeId: null,
-    };
-  });
-  toast.success("Workflow deleted.");
-});
+export const deleteCurrentWorkflowAtom = atom(
+  null,
+  async (get, set, workflowId?: string) => {
+    const targetWorkflowId = workflowId ?? get(appStateAtom).selectedWorkflowId;
+    if (!targetWorkflowId) return;
+
+    await deleteWorkflow(targetWorkflowId);
+    set(appStateAtom, (current) => {
+      const workflows = current.workflows.filter(
+        (workflow) => workflow.id !== targetWorkflowId,
+      );
+      const selectedWorkflowId =
+        current.selectedWorkflowId === targetWorkflowId
+          ? (workflows[0]?.id ?? null)
+          : current.selectedWorkflowId;
+
+      return {
+        ...current,
+        workflows,
+        selectedWorkflowId,
+        selectedNodeId: null,
+        selectedEdgeId: null,
+      };
+    });
+    toast.success("Workflow deleted.");
+  },
+);
 
 export const createConnectionAtom = atom(
   null,

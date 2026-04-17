@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { useAtomValue, useSetAtom } from "jotai";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -24,13 +35,15 @@ function WorkflowSettingsForm({
   name: string;
   description: string;
   mode: "standard" | "subworkflow";
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
   onSave: (draft: { name: string; description: string }) => void;
 }) {
   const [draft, setDraft] = useState(() => ({
     name,
     description,
   }));
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   return (
     <div className="mx-auto flex h-full max-w-[760px] flex-col">
@@ -78,9 +91,44 @@ function WorkflowSettingsForm({
               <Button variant="primary" onClick={() => onSave(draft)}>
                 Save
               </Button>
-              <Button onClick={onDelete} variant="destructive">
-                Delete workflow
-              </Button>
+              <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+              >
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">Delete workflow</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete workflow?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently deletes <strong>{name}</strong> and its
+                      saved runs, publish state, triggers, and schedules.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={isDeleting}
+                      onClick={async (event) => {
+                        event.preventDefault();
+                        setIsDeleting(true);
+                        try {
+                          await onDelete();
+                          setIsDeleteDialogOpen(false);
+                        } finally {
+                          setIsDeleting(false);
+                        }
+                      }}
+                      variant="destructive"
+                    >
+                      {isDeleting ? "Deleting..." : "Delete workflow"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
         </div>
@@ -91,6 +139,7 @@ function WorkflowSettingsForm({
 
 export function WorkflowSettingsPage() {
   const { workflowId } = useParams({ strict: false }) as { workflowId: string };
+  const navigate = useNavigate();
   const selectWorkflow = useSetAtom(selectWorkflowAtom);
   const workflow = useAtomValue(currentWorkflowAtom);
   const updateMeta = useSetAtom(saveWorkflowMetaAtom);
@@ -109,7 +158,10 @@ export function WorkflowSettingsPage() {
       name={workflow.name}
       description={workflow.description}
       mode={workflow.mode}
-      onDelete={() => void deleteWorkflow()}
+      onDelete={async () => {
+        await deleteWorkflow(workflow.id);
+        await navigate({ to: "/workflows" });
+      }}
       onSave={(draft) => {
         updateMeta({
           workflowId,
