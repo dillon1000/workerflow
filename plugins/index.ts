@@ -7,6 +7,7 @@
 
 import "./anthropic/index.ts";
 import "./core/index.ts";
+import "./discord/index.ts";
 import "./fal/index.ts";
 import "./github/index.ts";
 import "./linear/index.ts";
@@ -17,6 +18,7 @@ import "./planetscale/index.ts";
 export const pluginIds = [
   "anthropic",
   "core",
+  "discord",
   "fal",
   "github",
   "linear",
