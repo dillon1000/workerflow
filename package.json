@@ -5,7 +5,9 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
+    "create-plugin": "node ./scripts/create-plugin.mjs",
     "dev": "vite",
+    "discover-plugins": "node ./scripts/discover-plugins.mjs",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "type-check": "tsc -b",
