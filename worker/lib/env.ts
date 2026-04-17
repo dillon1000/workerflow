@@ -1,5 +1,5 @@
 export interface WorkerEnv extends Env {
-  ASSETS: {
+  ASSETS?: {
     fetch: typeof fetch;
   };
   HYPERDRIVE: Hyperdrive;

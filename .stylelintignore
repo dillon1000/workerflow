@@ -1,2 +1,3 @@
 drizzle/**/*.sql
 plugins/_template/**/*
+.claude/**/*

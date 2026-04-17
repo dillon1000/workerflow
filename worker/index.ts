@@ -42,7 +42,14 @@ export default {
     if (url.pathname.startsWith("/api/")) {
       return app.fetch(request, env, ctx);
     }
-    return env.ASSETS.fetch(request);
+
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+
+    return new Response("Static assets binding is not available.", {
+      status: 503,
+    });
   },
   async scheduled(
     controller: ScheduledController,

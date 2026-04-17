@@ -5,4 +5,6 @@
 - [x] Reusable snippets
 - [~] Support for other databases in the Query Data Block (done with PlanetScale)
 - [x] Support for other AI providers (openai, openrouter, anthropic, fal ai, etc.)
-- [] Reference other workflows in the workflow editor, and use their outputs as inputs, branch to other workflows (will require runtime changes)
+- [~] Reference other workflows in the workflow editor, and use their outputs as inputs, branch to other workflows (will require runtime changes)
+- [] File Browser & Upload Functionality R2
+- [] D1 Database Create & Browse

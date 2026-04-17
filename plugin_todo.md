@@ -4,5 +4,5 @@
 - [] GraphQL adapter https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.graphql/
 - [] Twitter/X Adapter https://docs.x.com/overview
 - [] Firecrawl Adapter https://docs.firecrawl.dev/introduction
-- [] Cloudflare D1 REST adapter https://developers.cloudflare.com/api/resources/d1/
 - [] Cloudflare KV REST adapter https://developers.cloudflare.com/api/resources/kv/
+- [] Cloudflare Email Service Adapter
