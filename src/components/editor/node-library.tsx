@@ -81,35 +81,36 @@ export function NodeLibrary({
                 </span>
               </button>
               {isCollapsed ? null : (
-              <ul>
-                {visible.map((template) => {
-                  const disabled = hasTrigger && template.family === "trigger";
-                  return (
-                    <li key={template.kind}>
-                      <button
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => onAddNode(template.kind)}
-                        className="group hairline-b flex w-full items-start gap-2 px-3 py-1.5 text-left transition-colors hover:bg-[color:var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-                      >
-                        <span className="mono mt-0.5 text-[10px] text-[color:var(--color-muted-foreground)] group-hover:text-[color:var(--color-primary)] group-disabled:group-hover:text-[color:var(--color-muted-foreground)]">
-                          {disabled ? "—" : "+"}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[12px] text-[color:var(--color-foreground)]">
-                            {template.title}
+                <ul>
+                  {visible.map((template) => {
+                    const disabled =
+                      hasTrigger && template.family === "trigger";
+                    return (
+                      <li key={template.kind}>
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => onAddNode(template.kind)}
+                          className="group hairline-b flex w-full items-start gap-2 px-3 py-1.5 text-left transition-colors hover:bg-[color:var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                        >
+                          <span className="mono mt-0.5 text-[10px] text-[color:var(--color-muted-foreground)] group-hover:text-[color:var(--color-primary)] group-disabled:group-hover:text-[color:var(--color-muted-foreground)]">
+                            {disabled ? "—" : "+"}
                           </span>
-                          <span className="block truncate text-[11px] text-[color:var(--color-muted-foreground)]">
-                            {disabled
-                              ? "Only one trigger per workflow."
-                              : template.subtitle}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[12px] text-[color:var(--color-foreground)]">
+                              {template.title}
+                            </span>
+                            <span className="block truncate text-[11px] text-[color:var(--color-muted-foreground)]">
+                              {disabled
+                                ? "Only one trigger per workflow."
+                                : template.subtitle}
+                            </span>
                           </span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </section>
           );

@@ -31,4 +31,5 @@ dist-ssr
 !.env.example
 
 /.claude/*
-.claude/worktrees/
+/.claude/worktrees/
+/.claude/worktrees/**
