@@ -15,53 +15,61 @@ function SubworkflowRow({
   parent,
   workflow,
   index,
+  isLast,
   selectWorkflow,
 }: {
   parent: WorkflowDefinition;
   workflow: WorkflowDefinition;
   index: number;
+  isLast: boolean;
   selectWorkflow: (workflowId: string) => void;
 }) {
   return (
-    <div className="ml-[92px] grid items-center gap-3 border-l border-[color:var(--color-border)] px-3 py-2 pl-5 hover:bg-[color:var(--color-surface)]">
-      <div
-        className="grid items-center gap-3"
-        style={{ gridTemplateColumns: "80px minmax(0,1fr) 100px 90px" }}
+    <div
+      className="grid items-center gap-3 px-3 py-1.5 hover:bg-[color:var(--color-surface)]"
+      style={{ gridTemplateColumns: "80px minmax(0,1fr) 120px 110px 90px" }}
+    >
+      <div className="mono text-right text-[11px] text-[color:var(--color-muted-foreground)]">
+        .{`${index + 1}`.padStart(2, "0")}
+      </div>
+      <Link
+        className="flex min-w-0 items-center gap-2"
+        onClick={() => selectWorkflow(workflow.id)}
+        params={{
+          parentWorkflowId: parent.id,
+          subworkflowId: workflow.id,
+        }}
+        to="/workflows/$parentWorkflowId/subworkflow/$subworkflowId/editor"
       >
-        <div className="mono text-[11px] text-[color:var(--color-muted-foreground)]">
-          {`${index + 1}`.padStart(2, "0")}
-        </div>
-        <Link
-          className="flex min-w-0 items-start gap-2"
-          onClick={() => selectWorkflow(workflow.id)}
-          params={{
-            parentWorkflowId: parent.id,
-            subworkflowId: workflow.id,
-          }}
-          to="/workflows/$parentWorkflowId/subworkflow/$subworkflowId/editor"
+        <div
+          aria-hidden
+          className="relative h-5 w-4 shrink-0 text-[color:var(--color-border)]"
         >
-          <div className="mt-0.5 flex shrink-0 items-center gap-1 text-[color:var(--color-muted-foreground)]">
-            <GitBranch className="h-3 w-3" />
+          <span
+            className={`absolute left-1.5 top-0 w-px bg-current ${isLast ? "h-[10px]" : "h-5"}`}
+          />
+          <span className="absolute left-1.5 top-[10px] h-px w-[10px] bg-current" />
+        </div>
+        <GitBranch className="h-3 w-3 shrink-0 text-[color:var(--color-muted-foreground)]" />
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-medium text-[color:var(--color-foreground)]">
+            {workflow.name}
           </div>
-          <div className="min-w-0">
-            <div className="text-[13px] font-medium text-[color:var(--color-foreground)]">
-              {workflow.name}
-            </div>
+          {workflow.description ? (
             <div className="truncate text-[11px] text-[color:var(--color-muted-foreground)]">
               {workflow.description}
             </div>
-          </div>
-        </Link>
-        <div>
-          <Badge
-            variant={workflow.status === "published" ? "success" : "muted"}
-          >
-            {workflow.status}
-          </Badge>
+          ) : null}
         </div>
-        <div className="mono text-right text-[11px] text-[color:var(--color-muted-foreground)]">
-          {formatRelativeTime(workflow.updatedAt)}
-        </div>
+      </Link>
+      <div>
+        <Badge variant={workflow.status === "published" ? "success" : "muted"}>
+          {workflow.status}
+        </Badge>
+      </div>
+      <div />
+      <div className="mono text-right text-[11px] text-[color:var(--color-muted-foreground)]">
+        {formatRelativeTime(workflow.updatedAt)}
       </div>
     </div>
   );
@@ -142,6 +150,7 @@ function WorkflowRow({
         <SubworkflowRow
           key={subworkflow.id}
           index={subIndex}
+          isLast={subIndex === subworkflows.length - 1}
           parent={workflow}
           selectWorkflow={selectWorkflow}
           workflow={subworkflow}
