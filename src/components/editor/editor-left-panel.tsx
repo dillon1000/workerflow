@@ -7,19 +7,30 @@ import type {
   WorkflowNodeKind,
 } from "@/lib/workflow/types";
 
+export type EditorLeftPanelTab = "library" | "snippets" | "generate";
+
 interface EditorLeftPanelProps {
   workflow: WorkflowDefinition;
   hasTrigger: boolean;
   onAddNode: (kind: WorkflowNodeKind) => void;
+  value?: EditorLeftPanelTab;
+  onValueChange?: (value: EditorLeftPanelTab) => void;
 }
 
 export function EditorLeftPanel({
   workflow,
   hasTrigger,
   onAddNode,
+  value,
+  onValueChange,
 }: EditorLeftPanelProps) {
   return (
-    <Tabs defaultValue="library" className="flex h-full min-h-0 flex-col">
+    <Tabs
+      value={value}
+      defaultValue={value ? undefined : "library"}
+      onValueChange={(next) => onValueChange?.(next as EditorLeftPanelTab)}
+      className="flex h-full min-h-0 flex-col"
+    >
       <TabsList className="hairline-b h-8 w-full justify-start px-3">
         <TabsTrigger value="library">Library</TabsTrigger>
         <TabsTrigger value="snippets">Snippets</TabsTrigger>

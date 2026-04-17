@@ -13,11 +13,7 @@ import {
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  activeRunAtom,
-  clearActiveRunAtom,
-  runCurrentWorkflowAtom,
-} from "@/state/app-state";
+import { activeRunAtom, clearActiveRunAtom } from "@/state/app-state";
 import type { RunStatus, WorkflowRunStep } from "@/lib/workflow/types";
 
 function formatDuration(ms?: number) {
@@ -106,9 +102,8 @@ function StepCard({ step, index }: { step: WorkflowRunStep; index: number }) {
   );
 }
 
-export function RunPanel() {
+export function RunPanel({ onRunWorkflow }: { onRunWorkflow: () => void }) {
   const run = useAtomValue(activeRunAtom);
-  const runAgain = useSetAtom(runCurrentWorkflowAtom);
   const clearActiveRun = useSetAtom(clearActiveRunAtom);
 
   if (!run) {
@@ -129,7 +124,7 @@ export function RunPanel() {
               className="mt-3"
               size="sm"
               variant="primary"
-              onClick={() => void runAgain()}
+              onClick={onRunWorkflow}
             >
               <Play className="h-3 w-3" />
               Run workflow
@@ -200,7 +195,7 @@ export function RunPanel() {
           size="sm"
           variant="primary"
           disabled={!terminal}
-          onClick={() => void runAgain()}
+          onClick={onRunWorkflow}
         >
           <RotateCcw className="h-3 w-3" />
           Run again

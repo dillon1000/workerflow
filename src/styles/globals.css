@@ -349,6 +349,217 @@ select {
   }
 }
 
+/* ------- sliding side panels ------- */
+
+.panel-shell {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.panel-shell-rail,
+.panel-shell-content {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transition:
+    transform 260ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 200ms ease;
+  will-change: transform, opacity;
+}
+
+.panel-shell-rail {
+  width: 28px;
+}
+
+.panel-shell[data-side="left"] .panel-shell-rail {
+  left: 0;
+}
+.panel-shell[data-side="right"] .panel-shell-rail {
+  right: 0;
+}
+
+.panel-shell[data-side="left"] .panel-shell-content {
+  left: 0;
+  width: 260px;
+}
+.panel-shell[data-side="right"] .panel-shell-content {
+  right: 0;
+  width: 340px;
+}
+
+/* Collapsed: content slides out, rail fades in */
+.panel-shell[data-collapsed="true"][data-side="left"] .panel-shell-content {
+  transform: translateX(calc(-100% + 28px));
+  opacity: 0;
+  pointer-events: none;
+}
+.panel-shell[data-collapsed="true"][data-side="right"] .panel-shell-content {
+  transform: translateX(calc(100% - 28px));
+  opacity: 0;
+  pointer-events: none;
+}
+.panel-shell[data-collapsed="false"] .panel-shell-rail {
+  opacity: 0;
+  pointer-events: none;
+}
+.panel-shell[data-collapsed="false"][data-side="left"] .panel-shell-rail {
+  transform: translateX(-6px);
+}
+.panel-shell[data-collapsed="false"][data-side="right"] .panel-shell-rail {
+  transform: translateX(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-shell,
+  .panel-shell-rail,
+  .panel-shell-content {
+    transition: none;
+  }
+}
+
+/* ------- command palette + quick look ------- */
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes palette-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.94);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes palette-pop-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+    filter: blur(1px);
+  }
+}
+
+@keyframes quicklook-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes quicklook-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+    filter: blur(2px);
+  }
+}
+
+@keyframes list-item-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.floating-overlay[data-state="open"] {
+  animation: overlay-in 140ms ease-out;
+}
+.floating-overlay[data-state="closing"] {
+  animation: overlay-out 140ms ease-in forwards;
+}
+
+.palette-card[data-state="open"] {
+  animation: palette-pop-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: top center;
+}
+.palette-card[data-state="closing"] {
+  animation: palette-pop-out 140ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  transform-origin: top center;
+}
+
+.palette-card[data-state="open"] .palette-result {
+  opacity: 0;
+  animation: list-item-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.palette-card[data-state="open"] .palette-result:nth-child(1) {
+  animation-delay: 40ms;
+}
+.palette-card[data-state="open"] .palette-result:nth-child(2) {
+  animation-delay: 70ms;
+}
+.palette-card[data-state="open"] .palette-result:nth-child(3) {
+  animation-delay: 100ms;
+}
+.palette-card[data-state="open"] .palette-result:nth-child(4) {
+  animation-delay: 130ms;
+}
+.palette-card[data-state="open"] .palette-result:nth-child(5) {
+  animation-delay: 160ms;
+}
+.palette-card[data-state="open"] .palette-result:nth-child(6) {
+  animation-delay: 190ms;
+}
+.palette-card[data-state="open"] .palette-result:nth-child(n + 7) {
+  animation-delay: 220ms;
+}
+
+.quicklook-card[data-state="open"] {
+  animation: quicklook-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.quicklook-card[data-state="closing"] {
+  animation: quicklook-out 160ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-overlay,
+  .palette-card,
+  .quicklook-card,
+  .palette-result {
+    animation: none !important;
+  }
+}
+
 /* cursor blink for terminal-y touches */
 .caret::after {
   content: "";
