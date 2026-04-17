@@ -182,7 +182,9 @@ export function InspectorPanel({
   const webhookUrl =
     node.data.kind === "webhook"
       ? `${globalThis.location?.origin ?? ""}/api/triggers/webhook/${workflow.id}/${node.id}`
-      : null;
+      : node.data.kind === "github" || node.data.kind === "linear"
+        ? `${globalThis.location?.origin ?? ""}/api/triggers/${node.data.kind}/${workflow.id}/${node.id}`
+        : null;
 
   const configIssues = Object.fromEntries(
     configFields

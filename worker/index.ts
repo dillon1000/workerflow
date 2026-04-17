@@ -12,6 +12,11 @@ import { dispatchScheduledRuns, WorkflowRunner } from "./services/runtime";
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
+app.use("/api/*", async (c, next) => {
+  await next();
+  c.header("Cache-Control", "no-store");
+});
+
 mountBootstrapRoutes(app);
 mountWorkflowRoutes(app);
 mountConnectionRoutes(app);

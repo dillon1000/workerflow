@@ -18,21 +18,43 @@ function triggerNode(graph: WorkflowGraph, kind: WorkflowNode["data"]["kind"]) {
   return graph.nodes.find((node) => node.data.kind === kind);
 }
 
+async function resolvePublishedWorkflow(
+  repository: Awaited<ReturnType<typeof createRepository>>,
+  workflowId: string,
+) {
+  const workflows = await repository.listPublishedWorkflows();
+  const match = workflows.find((entry) => entry.workflow.id === workflowId);
+  if (!match?.workflow.publishedVersionId) {
+    return null;
+  }
+
+  const version = await repository.getVersion(
+    match.userId,
+    match.workflow.publishedVersionId,
+  );
+
+  if (!version) {
+    return null;
+  }
+
+  return {
+    userId: match.userId,
+    workflow: match.workflow,
+    version,
+  };
+}
+
 export function mountTriggerRoutes(app: Hono<{ Bindings: WorkerEnv }>) {
   app.post("/api/triggers/webhook/:workflowId/:triggerId", async (c) => {
     const repository = await createRepository(c.env);
-    const workflows = await repository.listPublishedWorkflows();
-    const match = workflows.find(
-      (entry) => entry.workflow.id === c.req.param("workflowId"),
+    const resolved = await resolvePublishedWorkflow(
+      repository,
+      c.req.param("workflowId"),
     );
-    if (!match?.workflow.publishedVersionId) {
+    if (!resolved) {
       return c.json({ message: "Workflow not found." }, 404);
     }
-    const version = await repository.getVersion(
-      match.userId,
-      match.workflow.publishedVersionId,
-    );
-    const graph = version?.definition;
+    const graph = resolved.version.definition;
     const node = graph?.nodes.find(
       (candidate) =>
         candidate.id === c.req.param("triggerId") &&
@@ -51,10 +73,81 @@ export function mountTriggerRoutes(app: Hono<{ Bindings: WorkerEnv }>) {
       await launchWorkflowRun(
         repository,
         c.env,
-        match.workflow,
-        match.userId,
+        resolved.workflow,
+        resolved.userId,
         "webhook",
         parseBody(raw),
+      ),
+      202,
+    );
+  });
+
+  app.post("/api/triggers/:kind/:workflowId/:triggerId", async (c) => {
+    const kind = c.req.param("kind");
+    const handler = getTriggerHandler(kind);
+    if (!handler) {
+      return c.json({ message: `Trigger "${kind}" is not registered.` }, 404);
+    }
+
+    const repository = await createRepository(c.env);
+    const resolved = await resolvePublishedWorkflow(
+      repository,
+      c.req.param("workflowId"),
+    );
+    if (!resolved) {
+      return c.json({ message: "Workflow not found." }, 404);
+    }
+
+    const node = resolved.version.definition.nodes.find(
+      (candidate) =>
+        candidate.id === c.req.param("triggerId") &&
+        candidate.data.kind === kind,
+    );
+    if (!node) {
+      return c.json({ message: `${kind} trigger not found.` }, 404);
+    }
+
+    const raw = await c.req.text();
+    const payload = await Promise.resolve(
+      handler.preparePayload?.({
+        rawBody: raw,
+        payload: parseBody(raw),
+        headers: new Headers(c.req.raw.headers),
+      }) ?? parseBody(raw),
+    );
+
+    if (!handler.matches(node, payload)) {
+      return c.json(
+        { message: `Published ${kind} trigger did not match this event.` },
+        404,
+      );
+    }
+
+    try {
+      await handler.verify?.({
+        env: c.env,
+        repository,
+        userId: resolved.userId,
+        node,
+        rawBody: raw,
+        payload,
+        headers: new Headers(c.req.raw.headers),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Trigger verification failed.";
+      const status = /signature verification failed/i.test(message) ? 401 : 500;
+      return c.json({ message }, status);
+    }
+
+    return c.json(
+      await launchWorkflowRun(
+        repository,
+        c.env,
+        resolved.workflow,
+        resolved.userId,
+        kind,
+        payload,
       ),
       202,
     );
