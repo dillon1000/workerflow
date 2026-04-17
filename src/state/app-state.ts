@@ -231,6 +231,18 @@ function updateWorkflowInState(
   );
 }
 
+function mergeWorkflowWithLocalDraft(
+  current: WorkflowDefinition,
+  incoming: WorkflowDefinition,
+  draftGraph: WorkflowGraph,
+): WorkflowDefinition {
+  return {
+    ...current,
+    ...incoming,
+    draftGraph: normalizeGraph(draftGraph),
+  };
+}
+
 export const saveWorkflowMetaAtom = atom(
   null,
   (
@@ -526,18 +538,19 @@ export const saveCurrentWorkflowAtom = atom(null, async (get, set) => {
     (item) => item.id === state.selectedWorkflowId,
   );
   if (!workflow) return;
+  const draftGraph = workflow.draftGraph;
   try {
     const saved = await saveWorkflow(workflow.id, {
       name: workflow.name,
       description: workflow.description,
-      draftGraph: workflow.draftGraph,
+      draftGraph,
     });
     set(appStateAtom, (current) => ({
       ...current,
       workflows: updateWorkflowInState(
         current.workflows,
         workflow.id,
-        () => saved,
+        (existing) => mergeWorkflowWithLocalDraft(existing, saved, draftGraph),
       ),
     }));
     toast.success("Draft saved.");
@@ -552,6 +565,8 @@ export const publishCurrentWorkflowAtom = atom(null, async (get, set) => {
   const state = get(appStateAtom);
   const workflowId = state.selectedWorkflowId;
   if (!workflowId) return;
+  const workflow = state.workflows.find((item) => item.id === workflowId);
+  if (!workflow) return;
   try {
     const published = await publishWorkflow(workflowId);
     set(appStateAtom, (current) => ({
@@ -559,7 +574,8 @@ export const publishCurrentWorkflowAtom = atom(null, async (get, set) => {
       workflows: updateWorkflowInState(
         current.workflows,
         workflowId,
-        () => published,
+        (existing) =>
+          mergeWorkflowWithLocalDraft(existing, published, workflow.draftGraph),
       ),
     }));
     toast.success("Workflow published.");
