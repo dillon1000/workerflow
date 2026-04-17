@@ -11,15 +11,31 @@ Plugins are now folder-based and auto-discovered at build time. If you add a new
 
 You should not need to modify system files like `worker/services/runtime.ts`, `worker/routes/triggers.ts`, or `src/lib/workflow/templates.ts` to add a normal plugin.
 
+## Quick Start
+
+To scaffold a new plugin:
+
+```bash
+pnpm create-plugin
+```
+
+To refresh the generated plugin index after adding, removing, or renaming plugin folders:
+
+```bash
+pnpm discover-plugins
+```
+
+The scaffold creates a starter plugin from `plugins/_template/`. The discovery script regenerates `plugins/index.ts`, which tracks the plugin folders available in the repo.
+
 ## Folder Structure
 
 Each plugin should follow this shape:
 
 ```text
 plugins/<plugin-id>/
+  index.ts                # plugin manifest
   credentials.ts          # optional shared credential types
   icon.tsx                # optional icon for editor cards
-  index.ts                # plugin manifest
   steps/
     <step-id>.ts          # runtime step handlers
   test.ts                 # optional connection test
@@ -35,6 +51,8 @@ The app and worker discover plugins with `import.meta.glob` from these locations
 - `plugins/*/steps/*.ts`
 - `plugins/*/test.ts`
 - `plugins/*/trigger.ts`
+
+The repo also maintains a generated index at `plugins/index.ts` via `pnpm discover-plugins`. That file is for tooling and should not be edited manually.
 
 That means:
 
@@ -126,6 +144,7 @@ Supported field kinds:
 - `json`
 - `select`
 - `connection`
+- `workflow`
 
 Supported field options:
 
@@ -233,12 +252,13 @@ The remaining worker orchestration code is generic workflow execution plumbing, 
 
 Before finishing a plugin:
 
-1. Add the plugin folder and manifest.
-2. Add any required `steps/`, `trigger.ts`, and `test.ts`.
-3. Confirm the node appears in the Node panel.
-4. Confirm the Inspector fields render and validate.
-5. Confirm publish succeeds with valid config and fails with invalid config.
-6. Run `pnpm type-check`.
-7. Run `pnpm fix`.
+1. Run `pnpm create-plugin` or add the plugin folder and manifest manually.
+2. Run `pnpm discover-plugins` after adding, removing, or renaming a plugin folder.
+3. Add any required `steps/`, `trigger.ts`, and `test.ts`.
+4. Confirm the node appears in the Node panel.
+5. Confirm the Inspector fields render and validate.
+6. Confirm publish succeeds with valid config and fails with invalid config.
+7. Run `pnpm type-check`.
+8. Run `pnpm fix`.
 
 If your plugin talks to a third-party API, also verify at least one real request path end-to-end.
