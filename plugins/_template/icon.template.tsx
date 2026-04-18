@@ -1,4 +1,4 @@
-import type { WorkflowNodeIconComponent } from "../../src/lib/workflow/plugin-icons";
+import type { WorkflowNodeIconComponent } from "../../apps/web/src/lib/workflow/plugin-icons";
 
 export const PluginIcon: WorkflowNodeIconComponent = ({ className }) => (
   <svg

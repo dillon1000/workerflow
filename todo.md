@@ -8,3 +8,6 @@
 - [~] Reference other workflows in the workflow editor, and use their outputs as inputs, branch to other workflows (will require runtime changes)
 - [] File Browser & Upload Functionality R2
 - [] D1 Database Create & Browse
+- [] Teams & Multiplayer
+  - [] Enable Teams & Orgs in Better-Auth
+  - [] Durable Object for Multiplayer Editing

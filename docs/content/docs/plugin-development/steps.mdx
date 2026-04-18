@@ -1,0 +1,70 @@
+---
+title: Plugin Steps
+description: |
+  Runtime step modules, WorkflowStepRunner, execution modes, and how
+  the worker resolves handlers from plugin folders.
+---
+
+Executable workflow nodes (everything that is not a trigger family) run through **plugin step handlers**: one file per step under `plugins/<plugin-id>/steps/<step-id>.ts`.
+
+## Contract
+
+Each step module exports a single async function:
+
+```ts
+import type { WorkflowStepRunner } from "../../runtime";
+
+export const run: WorkflowStepRunner = async (context) => {
+  return {
+    detail: "Human-readable summary for run history.",
+    output: { any: "json-serializable value for downstream templates" },
+    status: "complete", // optional; defaults to complete
+    durationMs: 0, // optional
+  };
+};
+```
+
+The `WorkflowStepRunner` type and `WorkflowStepExecutionContext` live in `plugins/runtime.ts`. Prefer importing types from there so step code stays aligned with the worker.
+
+## Linking manifests to files
+
+In the plugin manifest (`plugins/<plugin-id>/index.ts`), each executable node sets `stepId` to the filename stem under `steps/` (without `.ts`). Example: `stepId: "create-issue"` loads `plugins/github/steps/create-issue.ts`.
+
+At build time, `apps/web/worker/services/plugin-runtime.ts` globs every `plugins/*/steps/*.ts` module and registers the runner under the composite key `"<pluginId>:<stepId>"`. When a run reaches a node, `getWorkflowStepRunner(node.data.kind)` looks up the **node kind** in `apps/web/src/lib/workflow/plugin-registry.ts`, reads `pluginId` and `stepId` from the merged definition, and returns the matching runner. If `stepId` is missing or no file exists, execution fails with no registered runner.
+
+## Execution context
+
+The worker constructs a context object in `apps/web/worker/services/runtime/execution.ts` before calling `run`. Highlights:
+
+| API | Role |
+| --- | --- |
+| `render(value)` | Substitute `{{ ... }}` templates using trigger payload and prior node outputs |
+| `parseList` / `parseMaybeJson` | Shared parsing helpers for list and JSON-shaped config |
+| `evaluateExpression` | Boolean expressions for logic-style nodes |
+| `getConnection` / `getConnectionSecret` | Resolve saved connections and KV-backed secrets for the current user |
+| `runSubworkflow` | Start a published child workflow and await its output |
+| `node`, `nodes`, `payload`, `outputs` | Current graph shape, trigger input, and per-node outputs keyed by node id |
+| `step` | Cloudflare Workflow step handle (see execution modes) |
+| `env` | Worker bindings (AI, Hyperdrive, and so on) |
+
+Triggers never call step runners: `executeNode` short-circuits `family === "trigger"` and records a synthetic completed step with the trigger payload as output.
+
+## Execution modes
+
+`WorkflowPluginNodeDefinition.executionMode` controls how the worker invokes the runner (`getWorkflowNodeExecutionMode` defaults to `"step"`).
+
+- **`step` (default)** — the handler runs inside `step.do("<nodeId>:<kind>", …)` so Cloudflare Workflows can checkpoint and retry the unit of work.
+- **`inline`** — the handler runs directly with the live `step` object. Use this only when you must call Workflow APIs on that handle, for example `step.sleep(...)` in the built-in wait step (`plugins/core/steps/wait.ts`).
+
+If you pick `inline`, keep the handler short and deterministic aside from the explicit Workflow calls you need.
+
+## Outputs and downstream templates
+
+Whatever you return as `output` is stored on the run step and exposed to later nodes. The template system resolves references like `{{ Some node title.data }}` using node titles and the outputs map; design stable titles when users rely on templates.
+
+## Related types
+
+- `WorkflowStepExecutionResult` — return shape from `run`
+- `WorkflowStepExecutionContext` — full context interface in `plugins/runtime.ts`
+
+For triggers and webhooks instead of steps, see the overview section on trigger plugins and `plugins/*/trigger.ts`.

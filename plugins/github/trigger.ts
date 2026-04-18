@@ -1,5 +1,5 @@
 import type { WorkflowTriggerHandler } from "../runtime";
-import type { WorkerEnv } from "../../worker/lib/env";
+import type { WorkerEnv } from "../../apps/web/worker/lib/env";
 
 export const triggerHandlers: WorkflowTriggerHandler[] = [
   {
@@ -43,7 +43,7 @@ export const triggerHandlers: WorkflowTriggerHandler[] = [
         throw new Error(`GitHub connection "${alias}" was not found.`);
       }
 
-      const { getSecret } = await import("../../worker/services/secrets");
+      const { getSecret } = await import("../../apps/web/worker/services/secrets");
       const secret = await getSecret(
         env as WorkerEnv,
         userId,
@@ -57,7 +57,7 @@ export const triggerHandlers: WorkflowTriggerHandler[] = [
       }
 
       const { verifyGithubSignature } =
-        await import("../../worker/services/security");
+        await import("../../apps/web/worker/services/security");
       const valid = await verifyGithubSignature(
         secret,
         rawBody,

@@ -1,0 +1,63 @@
+---
+title: Nodes
+description: |
+  Graph nodes versus plugin templates, the Node library, families,
+  and how new kinds enter the editor and the runtime.
+---
+
+In Workerflow, a **node** is a vertex in the workflow graph: a `WorkflowNode` with React Flow metadata (`id`, `position`, `type`) plus a strongly shaped `data` payload (`WorkflowNodeData` in `apps/web/src/lib/workflow/types.ts`).
+
+Plugin manifests describe **node kinds** the product understands; the editor materializes each instance from a **template** derived from that manifest.
+
+## WorkflowNodeData
+
+When a node exists on a graph, it carries:
+
+- `kind` — global node kind string (`githubAction`, `condition`, …). Must match a registered `WorkflowPluginNodeDefinition`.
+- `family` — `trigger`, `action`, `logic`, or `data`. Matches React Flow `node.type` and controls palette grouping, validation (exactly one trigger in standard workflows), and runtime branching (triggers bypass step runners).
+- `title`, `subtitle`, `accent` — editor-facing copy and card gradient; users can edit title/subtitle in the Inspector.
+- `config` — arbitrary JSON-shaped bag defined by your plugin fields and `defaultConfig`.
+- `enabled` — optional flag preserved through graph updates.
+
+`createNode(kind, position)` in `apps/web/src/lib/workflow/graph.ts` loads `getWorkflowTemplate(kind)` from the plugin registry, clones `defaultConfig` with `structuredClone`, and seeds title/subtitle/accent from the manifest defaults.
+
+## Templates versus definitions
+
+`workflowTemplates` (via `templates.ts`) exposes the lightweight `WorkflowTemplate` shape used by palettes: `kind`, `family`, `title`, `subtitle`, `accent`, `defaultConfig`.
+
+`workflowNodeDefinitions` keeps the full `RegisteredWorkflowNodeDefinition`, including `pluginId`, `stepId`, `executionMode`, and `fields`. Anything involving Inspector fields, validation, or worker dispatch uses the full definition.
+
+## Node library UI
+
+`apps/web/src/components/editor/node-library.tsx` calls `templatesByFamily()` and renders four collapsible sections keyed by family. Search matches title and subtitle text.
+
+Behavioral filters:
+
+- `parentContext` trigger is hidden from the standard library (only inserted for sub-workflows).
+- Standard workflows hide all trigger templates when `workflowMode === "subworkflow"`.
+- Additional triggers are disabled (not hidden) once a trigger already exists, with helper copy “Only one trigger per workflow.”
+
+Adding a node emits `onAddNode(kind)`; the parent creates a `WorkflowNode` through `createNode`.
+
+## Canvas and graph validation
+
+Nodes connect via `WorkflowEdge` values with optional `data.branch` for condition outputs. `validateGraph` enforces:
+
+- Trigger cardinality and sub-workflow trigger rules.
+- Known `kind`, field validation, duplicate webhook suffixes, incoming edges for non-triggers, true/false coverage for condition nodes, acyclic graphs, and dangling edge endpoints.
+
+Publishing and the worker both rely on these checks before execution.
+
+## Runtime mapping
+
+During a run, the worker walks the graph starting at the resolved trigger. For each non-trigger node it loads the plugin runner via `getWorkflowStepRunner`, stores the returned `output` under `outputs[node.id]`, and schedules downstream ids based on edges (with special handling for condition outputs). See `executeWorkflowGraph` in `apps/web/worker/services/runtime/execution.ts`.
+
+## Icons
+
+Optional `plugins/<plugin-id>/icon.tsx` modules are discovered separately for rich cards; manifests still supply textual title/subtitle/accent for defaults.
+
+## See also
+
+- [Plugin Development Guide](./index) for scaffolding and folder layout
+- [Plugin Steps](./steps) for `stepId` and handler lookup
+- [Plugin Schema](./schema) for manifest fields that define each kind

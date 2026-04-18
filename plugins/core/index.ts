@@ -175,6 +175,51 @@ export const plugin: WorkflowPluginManifest = {
       ],
     },
     {
+      kind: "askForInput",
+      family: "data",
+      title: "Ask for input",
+      subtitle: "Collect text from a button-triggered run before execution.",
+      accent: accent.data,
+      defaultConfig: {
+        label: "Your input",
+        placeholder: "Enter a value",
+        defaultValue: "",
+        required: "true",
+      },
+      stepId: "ask-for-input",
+      fields: [
+        {
+          key: "label",
+          label: "Field label",
+          kind: "text",
+          required: true,
+          placeholder: "Your input",
+        },
+        {
+          key: "placeholder",
+          label: "Placeholder",
+          kind: "text",
+          placeholder: "Enter a value",
+        },
+        {
+          key: "defaultValue",
+          label: "Default value",
+          kind: "text",
+          placeholder: "Optional starting text",
+        },
+        {
+          key: "required",
+          label: "Required",
+          kind: "select",
+          required: true,
+          options: [
+            { label: "Required", value: "true" },
+            { label: "Optional", value: "false" },
+          ],
+        },
+      ],
+    },
+    {
       kind: "wait",
       family: "action",
       title: "Wait",

@@ -2,7 +2,7 @@ import type {
   ConnectionDefinition,
   RunStatus,
   WorkflowNode,
-} from "../src/lib/workflow/types";
+} from "../apps/web/src/lib/workflow/types";
 
 export interface WorkflowRuntimeStep {
   sleep: (...args: unknown[]) => Promise<void>;

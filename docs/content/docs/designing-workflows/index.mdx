@@ -1,0 +1,46 @@
+---
+title: Designing workflows
+description: |
+  How graphs, triggers, the Node library, Inspector config, and publish
+  validation fit together when you build a workflow in Workerflow.
+---
+
+A **workflow** in Workerflow is a **directed graph**: nodes are steps or triggers; edges describe execution order (and, for conditions, which branch fires). The editor stores a **draft** graph you edit freely; **publishing** freezes a version the runtime can load for production runs.
+
+## Canvas and graph model
+
+The canvas is built on **React Flow**. Each vertex is a `WorkflowNode` with a position, a **family** (`trigger`, `action`, `logic`, or `data`), a stable **kind** string (for example `githubAction` or `condition`), and a `config` object shaped by that node’s plugin fields. Edges carry optional metadata such as **true** / **false** branches leaving a condition node.
+
+When you add a node from the **Node library**, the app clones the plugin template’s `defaultConfig` and display defaults (title, subtitle, accent). Moving or reconnecting nodes updates only the graph structure; configuration lives in the Inspector.
+
+## One trigger per workflow
+
+Standard workflows must contain **exactly one** trigger family node. That node defines how a run starts: button, schedule, webhook, or a provider trigger such as GitHub or Linear. The library disables adding a second trigger so the graph cannot accidentally fork at entry.
+
+**Sub-workflows** are different: they use a dedicated **context from parent workflow** trigger and cannot use button, webhook, or schedule triggers. The validator enforces that shape so a child graph always receives input from its parent run.
+
+## Node library and families
+
+The library groups templates by **family** so you can scan triggers, actions, logic, and data nodes separately. Search matches title and subtitle. Not every manifest node appears in every mode (for example the parent-context trigger is hidden in standard workflows).
+
+## Inspector and configuration
+
+Selecting a node opens the **Inspector**: title, subtitle, and every **field** declared by the plugin for that `kind`. Field kinds map to typed controls (text, numbers, JSON, selects, connection pickers, sub-workflow pickers). Fields can allow **templates** that reference upstream node output using the `{{ Node title.data }}` pattern; the References panel lists strict ancestors you can copy from.
+
+Selecting an edge from a **condition** node lets you label the path as true or false so the runtime knows which downstream nodes to run after the condition evaluates.
+
+## Connections
+
+Actions that call third-party APIs usually declare a **connection** field tied to a **provider** id. Users create connections once in the Connections UI (driven by each plugin’s `connections` schema), then pick an alias on the node. The runtime resolves aliases to stored secrets during execution.
+
+## Validation and publish
+
+Before a workflow is considered runnable in production, **graph validation** checks structure and config: registered kinds, required fields, trigger rules, non-trigger nodes having an incoming edge, condition branches, acyclic graphs, duplicate webhook path suffixes, and valid edge endpoints. The same field rules run in the Inspector and in validation so publish errors match what you already saw while editing.
+
+Publishing writes a **versioned** definition the worker uses for runs. Sub-workflows referenced by id must be published before a parent run can invoke them.
+
+## Execution snapshot
+
+At runtime the worker walks the graph from the trigger, executes each non-trigger node through the matching **plugin step** (or inline handler for special cases), records **step output** per node, and passes that output into template rendering for later nodes. Condition outputs choose the next nodes based on edge branch metadata.
+
+For a deeper look at how plugins supply nodes and steps, see the [Plugin Development](/docs/plugin-development) section.
