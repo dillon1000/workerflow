@@ -2,10 +2,13 @@
   "name": "workerflow-docs",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
+    "cf:dev": "wrangler dev -c wrangler.jsonc",
+    "deploy": "wrangler deploy -c wrangler.jsonc",
     "type-check": "react-router typegen && fumadocs-mdx && tsc --noEmit",
     "types:check": "react-router typegen && fumadocs-mdx && tsc --noEmit",
     "fix": "oxlint --fix",
