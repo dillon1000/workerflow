@@ -1,0 +1,112 @@
+---
+title: Self-hosting
+description: |
+  Run Workerflow on Cloudflare Workers: bindings, PostgreSQL via
+  Hyperdrive, secrets, and schema setup.
+---
+
+Workerflow ships as a single **Workers + Assets** application under `apps/web/`. The Vite app and Hono API share one Worker (`apps/web/worker/index.ts`). This page describes what you must provision in Cloudflare, how the **database** fits in, and which **environment variables** and secrets the runtime expects.
+
+## Prerequisites
+
+- Node.js and **pnpm** (see repository `AGENTS.md`).
+- A **Cloudflare** account with Workers, **Workflows**, **KV**, **Hyperdrive**, and (for AI nodes) **Workers AI** available.
+- A **PostgreSQL** database reachable from Cloudflare (managed Postgres, Neon, RDS, or similar). Hyperdrive sits in front of it in production.
+
+## Cloudflare Workers bindings
+
+Bindings are declared in `apps/web/wrangler.jsonc`. The TypeScript contract is `WorkerEnv` in `apps/web/worker/lib/env.ts`.
+
+| Binding | Type | Purpose |
+| --- | --- | --- |
+| `HYPERDRIVE` | Hyperdrive | Connection pooler to PostgreSQL for all Drizzle access in the Worker and workflow runner. |
+| `SECRETS_KV` | KV namespace | Stores encrypted connection secrets and related KV-backed material for the secrets service. |
+| `AI` | Workers AI | Required for core **AI text** and **AI image** steps (`env.AI.run`). |
+| `WORKFLOW_RUNNER` | Workflow | Durable workflow runs; `class_name` must match the exported `WorkflowRunner` in `apps/web/worker/index.ts`. |
+| `ASSETS` | Assets | Injected when serving the built SPA from the Worker (Vite + Workers assets pipeline). |
+
+Optional: `ANALYTICS` is typed as optional on `WorkerEnv` if you add an Analytics Engine binding later.
+
+### What to change in `wrangler.jsonc`
+
+1. **`hyperdrive`** — Replace the example `id` with the id of a [Hyperdrive](https://developers.cloudflare.com/hyperdrive/) configuration that points at your Postgres origin. The binding name **`HYPERDRIVE`** must stay as-is unless you change code that calls `createDb(env)`.
+2. **`kv_namespaces`** — Create a KV namespace in the dashboard (or `wrangler kv namespace create`), put its `id` in the config, and keep the binding name **`SECRETS_KV`**.
+3. **`workflows`** — Ensure `class_name` is `WorkflowRunner` and the `name` matches what you want in the dashboard; align with Cloudflare Workflows docs if you rename.
+4. **`triggers.crons`** — The repo uses a frequent cron (`* * * * *`) so the Worker can evaluate **schedule** triggers. Adjust to your tolerance for dispatch latency versus invocations.
+
+After editing bindings, run `pnpm --filter workerflow-web cf-typegen` (or `wrangler types` in `apps/web`) if you rely on generated `Env` types.
+
+## Database
+
+### Role of Postgres
+
+Application data (users, workflows, versions, runs, connections metadata, and so on) lives in **PostgreSQL**, accessed through **Drizzle** and `apps/web/worker/lib/schema.ts`. Migrations are emitted under `drizzle/` at the repo root.
+
+### Two connection paths
+
+1. **Local tooling and Drizzle CLI** — `drizzle.config.ts` reads **`DATABASE_URL`** from the environment (see `.env.example`). Use a direct Postgres URL for `pnpm db:generate` and `pnpm db:push` from your machine or CI. This URL should point at the **same logical database** Hyperdrive will target in production so the schema matches.
+2. **Worker and Workflows at runtime** — The repository layer uses **`env.HYPERDRIVE.connectionString`** (via `createDb` in `apps/web/worker/services/database.ts`), not `DATABASE_URL` inside the Worker. Configure Hyperdrive’s origin to that database and attach the Hyperdrive config id in `wrangler.jsonc`.
+
+### Applying the schema
+
+From the repository root (with `.env` containing `DATABASE_URL`):
+
+```bash
+pnpm install
+pnpm db:push
+```
+
+Use `pnpm db:generate` when you need new migration files after schema changes. Never hand-edit SQL in `drizzle/` per project conventions.
+
+## Configuration and secrets
+
+### Operational secrets (app-wide)
+
+These are **not** provider API keys for integrations (those are stored as **connections** in the app). They secure auth and at-rest secret storage.
+
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `BETTER_AUTH_SECRET` | `.dev.vars` locally; `wrangler secret` in production | Session signing for Better Auth. |
+| `BETTER_AUTH_URL` | Same | Public base URL of the app (e.g. `https://workflow.example.com`). Must match how users reach the Worker. |
+| `SECRETS_KEY` | Same | **64 hex characters** (32 bytes) for AES-256-GCM encryption of values stored in KV. If missing, the secrets layer falls back to plaintext prefixes (not recommended). |
+| `DATABASE_URL` | `.env` (root) | Used only by Drizzle CLI and local tools, not inside the deployed Worker. |
+
+Examples live in `.env.example` and `.dev.vars.example` at the repo root.
+
+### Local development
+
+```bash
+cp .env.example .env
+cp .dev.vars.example .dev.vars
+```
+
+Fill in secrets, set `DATABASE_URL` for local Postgres, and align **`apps/web/wrangler.jsonc`** with KV, Hyperdrive, AI, and Workflows resources in your account. Then:
+
+```bash
+pnpm dev
+```
+
+The Cloudflare Vite plugin runs the Worker with bindings supplied from Wrangler (including `.dev.vars` for secrets).
+
+### Production
+
+1. Build and deploy from `apps/web`: `pnpm deploy` (see `apps/web/package.json`; this runs `vite build` then `wrangler deploy`).
+2. Set secrets on the Worker: `wrangler secret put BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `SECRETS_KEY` (or configure the same keys in the dashboard). Non-secret vars can use `[vars]` in `wrangler.jsonc` if you prefer.
+3. Confirm **`BETTER_AUTH_URL`** is the canonical HTTPS origin users use; OAuth and cookies depend on it.
+
+## Deploy checklist
+
+- [ ] Postgres created; `pnpm db:push` applied using `DATABASE_URL`.
+- [ ] Hyperdrive config created and id set in `wrangler.jsonc`.
+- [ ] KV namespace created and id set; binding name `SECRETS_KV`.
+- [ ] Workers AI enabled; `ai.binding` remains `AI` unless you update code.
+- [ ] Workflows binding deployed; `WorkflowRunner` class exported from `worker/index.ts`.
+- [ ] Cron schedule in `wrangler.jsonc` acceptable for schedule-trigger polling.
+- [ ] `BETTER_AUTH_*` and `SECRETS_KEY` set for the deployed Worker.
+- [ ] Smoke test: sign in, create workflow, run a simple graph, verify a schedule or webhook path if used.
+
+## Related docs
+
+- [Workerflow overview](/docs) and [Designing workflows](/docs/designing-workflows)
+- [Plugin development](/docs/plugin-development) for extending integrations
+- Repository **README** for quick copy-paste commands

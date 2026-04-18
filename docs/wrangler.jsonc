@@ -8,10 +8,7 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "workerflow-docs",
-  "main": "build/server/index.js",
-  "assets": {
-    "directory": "build/client"
-  },
+  "main": "workers/app.ts",
   "compatibility_date": "2026-04-17",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {

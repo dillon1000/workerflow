@@ -1,13 +1,13 @@
 import type { Config } from '@react-router/dev/config';
 import { glob } from 'node:fs/promises';
 import { createGetUrl, getSlugs } from 'fumadocs-core/source';
-import { getPageImagePath } from './app/lib/og';
 
 const getUrl = createGetUrl('/docs');
 
 export default {
   ssr: true,
   future: {
+    v8_viteEnvironmentApi: true,
     v8_middleware: true,
   },
   async prerender({ getStaticPaths }) {
@@ -22,7 +22,6 @@ export default {
       const slugs = getSlugs(entry);
 
       paths.push(getUrl(slugs));
-      paths.push(getPageImagePath(slugs));
     }
 
     return paths;

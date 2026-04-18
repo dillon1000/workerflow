@@ -4,11 +4,11 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "react-router build",
-    "dev": "react-router dev",
+    "build": "vite build",
+    "dev": "vite",
     "start": "react-router-serve ./build/server/index.js",
-    "cf:dev": "wrangler dev -c wrangler.jsonc",
-    "deploy": "wrangler deploy -c wrangler.jsonc",
+    "cf:dev": "vite",
+    "deploy": "pnpm build && wrangler deploy",
     "type-check": "react-router typegen && fumadocs-mdx && tsc --noEmit",
     "types:check": "react-router typegen && fumadocs-mdx && tsc --noEmit",
     "fix": "oxlint --fix",
@@ -45,6 +45,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.32.3",
     "@react-router/dev": "^7.14.1",
     "@tailwindcss/vite": "^4.2.2",
     "@types/hast": "^3.0.4",
@@ -56,6 +57,7 @@
     "react-router-devtools": "^6.2.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
-    "vite": "^8.0.8"
+    "vite": "^8.0.8",
+    "wrangler": "^4.83.0"
   }
 }
