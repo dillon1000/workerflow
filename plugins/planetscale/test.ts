@@ -1,5 +1,5 @@
 import type { ConnectionTestRunner } from "../runtime";
-import type { WorkerEnv } from "../../worker/lib/env";
+import type { WorkerEnv } from "../../apps/web/worker/lib/env";
 import { executePlanetscaleQuery, parseConnectionString } from "./client";
 
 export const testConnection: ConnectionTestRunner = async ({
@@ -7,7 +7,7 @@ export const testConnection: ConnectionTestRunner = async ({
   env,
   userId,
 }) => {
-  const { getSecret } = await import("../../worker/services/secrets");
+  const { getSecret } = await import("../../apps/web/worker/services/secrets");
   const connectionString = await getSecret(
     env as WorkerEnv,
     userId,

@@ -45,10 +45,10 @@ Current extension points are auto-discovered:
 
 Normal plugin work should not require manual edits to:
 
-- `src/lib/workflow/templates.ts`
-- `worker/routes/triggers.ts`
-- `worker/routes/connections.ts`
-- `worker/services/runtime.ts`
+- `apps/web/src/lib/workflow/templates.ts`
+- `apps/web/worker/routes/triggers.ts`
+- `apps/web/worker/routes/connections.ts`
+- `apps/web/worker/services/runtime.ts`
 
 Before finishing plugin work, run:
 

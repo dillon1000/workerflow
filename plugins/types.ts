@@ -1,7 +1,7 @@
 import type {
   WorkflowFamily,
   WorkflowNodeKind,
-} from "../src/lib/workflow/types";
+} from "../apps/web/src/lib/workflow/types";
 
 export type ConnectionFieldKind = "text" | "password" | "textarea" | "url";
 

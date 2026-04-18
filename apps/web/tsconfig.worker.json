@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../node_modules/.tmp/apps-web-tsconfig.worker.tsbuildinfo",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["./worker-configuration.d.ts", "vite/client"]
+  },
+  "include": [
+    "worker",
+    "../../plugins/**/*.ts",
+    "src/lib/workflow/**/*.ts"
+  ],
+  "exclude": ["../../plugins/_template/**/*"]
+}

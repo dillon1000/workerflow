@@ -1,12 +1,12 @@
 import type { ConnectionTestRunner } from "../runtime";
-import type { WorkerEnv } from "../../worker/lib/env";
+import type { WorkerEnv } from "../../apps/web/worker/lib/env";
 
 export const testConnection: ConnectionTestRunner = async ({
   connection,
   env,
   userId,
 }) => {
-  const { getSecret } = await import("../../worker/services/secrets");
+  const { getSecret } = await import("../../apps/web/worker/services/secrets");
   const token = await getSecret(
     env as WorkerEnv,
     userId,

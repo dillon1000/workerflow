@@ -1,5 +1,5 @@
 import type { WorkflowStepRunner } from "../../runtime";
-import { queryDatabase } from "../../../worker/services/database";
+import { queryDatabase } from "../../../apps/web/worker/services/database";
 
 export const run: WorkflowStepRunner = async ({ env, node, render }) => {
   const sql = render(String(node.data.config.sql ?? "select 1 as ok"));
