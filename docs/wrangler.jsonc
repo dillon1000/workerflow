@@ -10,7 +10,7 @@
   "name": "workerflow-docs",
   "main": "workers/app.ts",
   "compatibility_date": "2026-04-17",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "enable_nodejs_process_v2", "nodejs_compat_populate_process_env"],
   "observability": {
     "enabled": true
   }

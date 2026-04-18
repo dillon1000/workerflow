@@ -4,8 +4,8 @@ export function Agents() {
       <div className="container">
         <div className="section-head">
           <span className="section-kicker">§ 02 — AI Authoring</span>
-          <h2 className="section-title">Describe the workflow.<br />Let the canvas <em>draw itself</em>.</h2>
-          <p className="section-sub">An AI copilot built into the editor — it reads your connections and custom nodes, proposes graphs from plain English, and refactors what's already there.</p>
+          <h2 className="section-title">Describe the workflow.<br />Let the canvas <em>connect itself</em>.</h2>
+          <p className="section-sub">Your AI copilot built into the editor, it reads your connections and custom nodes, proposes graphs from plain English, and refactors what's already there.</p>
         </div>
 
         <div className="agents-grid">
@@ -15,35 +15,24 @@ export function Agents() {
                 <span className="fact-num mono">A</span>
                 <div>
                   <h4>Type what you want.</h4>
-                  <p>"When a Stripe webhook fires, classify it, open a Linear ticket if it's a dispute." The copilot lays down the nodes, wires the edges, and fills the fields using <span className="k">conn:stripe</span> and <span className="k">conn:linear/ops</span> you already have.</p>
+                  <p>"When a Stripe webhook fires, classify it, open a Linear ticket if it's a dispute." The copilot lays down the nodes, wires the edges, and fills the fields using <span className="k">cstripe</span> and <span className="k">linear/ops</span> connections you already have.</p>
                 </div>
               </li>
               <li className="fact">
                 <span className="fact-num mono">B</span>
                 <div>
                   <h4>Refactor by selection.</h4>
-                  <p>Lasso a subgraph, ask <span className="k">/simplify</span> or <span className="k">/add retry</span>. The copilot returns a visual diff — new nodes tinted green, removed ones dimmed — that you accept, tweak, or throw away.</p>
+                  <p>Grab a subgraph, ask <span className="k">"Explain what this does"</span> or <span className="k">"Can you add a Slack Message""</span>. The copilot returns a visual diff — new nodes tinted green, removed ones dimmed — that you accept, tweak, or throw away.</p>
                 </div>
               </li>
               <li className="fact">
                 <span className="fact-num mono">C</span>
                 <div>
-                  <h4>Grounded in your canvas.</h4>
+                  <h4>Fully grounded in your canvas.</h4>
                   <p>The copilot sees your connection handles, custom node library, and prior runs. Suggestions reference <span className="k">your</span> primitives — not a hallucinated API.</p>
                 </div>
               </li>
             </ul>
-
-            <div className="agents-actions">
-              <a className="btn btn-lg btn-primary" href="#docs">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3 2.09 6.26L20 11l-5.91 1.74L12 19l-2.09-6.26L4 11l5.91-1.74z" /></svg>
-                Try the copilot
-              </a>
-              <a className="btn btn-lg btn-outline" href="#docs">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 8h10M7 12h6M7 16h4" /></svg>
-                Prompt recipes
-              </a>
-            </div>
           </div>
 
           <div className="compose" aria-hidden="true">

@@ -1,5 +1,9 @@
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from 'ai';
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  tool,
+  type UIMessage,
+} from 'ai';
 import { z } from 'zod';
 import { cloudflareLoadContext } from '@/lib/cloudflare-context';
 import { source } from '@/lib/source';
@@ -65,10 +69,84 @@ async function chunkedAll<O>(promises: Promise<O>[]): Promise<O[]> {
 
 function openRouterConfig(context: Route.ActionArgs['context']) {
   const cf = context.get(cloudflareLoadContext)?.env;
+  const apiKey = (cf?.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY)?.trim();
   return {
-    apiKey: cf?.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY,
+    apiKey,
     model: cf?.OPENROUTER_MODEL ?? process.env.OPENROUTER_MODEL ?? 'google/gemini-3.1-flash-lite-preview',
   };
+}
+
+function getMessageText(message: ChatUIMessage): string {
+  return message.parts
+    ?.flatMap((part) => {
+      if (part.type === 'text') return [part.text];
+      if (part.type === 'data-client') {
+        return [`[Client Context: ${JSON.stringify(part.data)}]`];
+      }
+      return [];
+    })
+    .join('\n')
+    .trim() ?? '';
+}
+
+async function searchDocs(query: string, limit = 6): Promise<CustomDocument[]> {
+  const search = await searchServer;
+  const results = await search.searchAsync(query, { limit, merge: true, enrich: true });
+  const entries = Array.isArray(results) ? results : [];
+
+  return entries
+    .flatMap((entry) => ('result' in entry && Array.isArray(entry.result) ? entry.result : []))
+    .map((item) => item.doc)
+    .filter((doc): doc is CustomDocument => Boolean(doc));
+}
+
+function buildSearchContext(docs: CustomDocument[]) {
+  if (docs.length === 0) {
+    return 'No relevant documentation results were found.';
+  }
+
+  return docs
+    .map((doc, index) => {
+      const excerpt = doc.content.replace(/\s+/g, ' ').trim().slice(0, 1800);
+      return [
+        `Result ${index + 1}:`,
+        `Title: ${doc.title}`,
+        `URL: ${doc.url}`,
+        `Description: ${doc.description}`,
+        `Content: ${excerpt}`,
+      ].join('\n');
+    })
+    .join('\n\n');
+}
+
+async function callOpenRouter(
+  apiKey: string,
+  model: string,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+) {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.2,
+    }),
+  });
+
+  const body = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new Error(body.error?.message ?? `OpenRouter returned ${response.status}.`);
+  }
+
+  return body.choices?.[0]?.message?.content?.trim() || 'I could not generate an answer.';
 }
 
 /** System prompt, you can update it to provide more specific information */
@@ -82,6 +160,7 @@ const systemPrompt = [
 export async function action(args: Route.ActionArgs) {
   const req = args.request;
   const reqJson = (await req.json()) as { messages?: ChatUIMessage[] };
+  const messages = reqJson.messages ?? [];
 
   const { apiKey, model } = openRouterConfig(args.context);
   if (!apiKey) {
@@ -94,30 +173,50 @@ export async function action(args: Route.ActionArgs) {
     );
   }
 
-  const openrouter = createOpenRouter({ apiKey });
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user');
+  const query = latestUserMessage ? getMessageText(latestUserMessage) : '';
+  const docs = query ? await searchDocs(query) : [];
+  const docsContext = buildSearchContext(docs);
 
-  const result = streamText({
-    model: openrouter.chat(model),
-    stopWhen: stepCountIs(5),
-    tools: {
-      search: searchTool,
+  const upstreamMessages = [
+    { role: 'system' as const, content: systemPrompt },
+    {
+      role: 'system' as const,
+      content: [
+        'Relevant docs context follows. Prefer this information over prior assumptions.',
+        'Cite sources as markdown links using the URL exactly as provided.',
+        docsContext,
+      ].join('\n\n'),
     },
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...(await convertToModelMessages<ChatUIMessage>(reqJson.messages ?? [], {
-        convertDataPart(part) {
-          if (part.type === 'data-client')
-            return {
-              type: 'text',
-              text: `[Client Context: ${JSON.stringify(part.data)}]`,
-            };
-        },
-      })),
-    ],
-    toolChoice: 'auto',
+    ...messages
+      .map((message) => {
+        const content = getMessageText(message);
+        if (!content) return null;
+        if (message.role === 'assistant') {
+          return { role: 'assistant' as const, content };
+        }
+        return { role: 'user' as const, content };
+      })
+      .filter((message): message is { role: 'user' | 'assistant'; content: string } =>
+        Boolean(message),
+      ),
+  ];
+
+  const stream = createUIMessageStream<ChatUIMessage>({
+    originalMessages: messages,
+    execute: async ({ writer }) => {
+      const textId = crypto.randomUUID();
+      const answer = await callOpenRouter(apiKey, model, upstreamMessages);
+
+      writer.write({ type: 'start' });
+      writer.write({ type: 'text-start', id: textId });
+      writer.write({ type: 'text-delta', id: textId, delta: answer });
+      writer.write({ type: 'text-end', id: textId });
+      writer.write({ type: 'finish', finishReason: 'stop' });
+    },
   });
 
-  return result.toUIMessageStreamResponse();
+  return createUIMessageStreamResponse({ stream });
 }
 
 

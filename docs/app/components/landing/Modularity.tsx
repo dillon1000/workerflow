@@ -14,8 +14,8 @@ export function Modularity() {
               <span className="mod-num">01</span>
               <span className="mod-tag">compose</span>
             </div>
-            <h3>Small pieces,<br />loosely joined.</h3>
-            <p>Triggers, actions, logic, and data nodes are the only primitives. Drop them on the canvas, connect the handles, and you have a workflow — no configuration files, no framework to learn.</p>
+            <h3>All together<br />now.</h3>
+            <p>Triggers, actions, logic, and data nodes are the only primitives. Drop them on the canvas, connect the handles, and you have a workflow — no configuration files, no code to write, no framework to learn.</p>
             <div className="mod-viz viz-stack" aria-hidden="true">
               <div className="viz-row">
                 <span className="sw" style={{ background: 'var(--family-trigger)' }}></span>
@@ -76,7 +76,7 @@ export function Modularity() {
               <span className="mod-num">03</span>
               <span className="mod-tag">reuse</span>
             </div>
-            <h3>One connection,<br />many nodes.</h3>
+            <h3>This connection<br />is mine.</h3>
             <p>Store a provider credential once. Reference it by handle — <span className="k">conn:github/main</span> — from anywhere in any workflow. Rotate the token in one place and every node picks it up.</p>
             <div className="mod-viz viz-manifest" aria-hidden="true">
               <div className="line"><span className="g">●</span><span>connections/</span></div>
