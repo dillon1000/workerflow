@@ -1,0 +1,25 @@
+---
+title: Transform JSON (core)
+description: |
+  Builds a JSON value by rendering a template string then parsing JSON.
+---
+
+- **Kind:** `transformJson`
+- **Family:** `data`
+- **Step:** `plugins/core/steps/transform-json.ts`
+
+Pipeline: `render(template)` then `parseMaybeJson` on the result. With `allowTemplates: true`, you can embed upstream references inside JSON-shaped text; if the rendered string is not valid JSON, parsing behavior follows `parseMaybeJson`.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `template` | json, required, templates allowed | JSON template (example `{"summary":"{{ trigger.data }}"}`). |
+
+## Output
+
+Parsed JSON value (object, array, or primitive) used as this node’s output.
+
+## Related
+
+- [Static text](./static-text)

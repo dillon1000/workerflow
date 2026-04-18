@@ -1,0 +1,31 @@
+---
+title: HTTP request (core)
+description: |
+  Generic authenticated or unauthenticated fetch with JSON headers and
+  optional templated body.
+---
+
+- **Kind:** `httpRequest`
+- **Family:** `action`
+- **Step:** `plugins/core/steps/http-request.ts`
+
+Builds a `fetch` from method, URL, headers JSON, and body. Headers are parsed with `JSON.parse` after `render` (they must be valid JSON). GET requests omit the body; other methods send the rendered body string.
+
+HTTP error responses mark the step status as **errored** while still returning parsed JSON output when the body parses.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `method` | select, required | `GET`, `POST`, `PUT`, `PATCH`, or `DELETE`. |
+| `url` | text, required | Request URL. |
+| `headers` | json | Default `{}`; must be valid JSON. |
+| `body` | textarea, templates allowed | Sent for non-GET methods. |
+
+## Output
+
+Parsed JSON when applicable; otherwise structured by `parseMaybeJson`.
+
+## Related
+
+- [Send webhook](./send-webhook)

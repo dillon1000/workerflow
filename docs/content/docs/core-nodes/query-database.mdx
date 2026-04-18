@@ -1,0 +1,30 @@
+---
+title: Query database (core)
+description: |
+  Executes a single SQL string against PostgreSQL using the worker
+  Hyperdrive connection string.
+---
+
+- **Kind:** `queryDatabase`
+- **Family:** `data`
+- **Step:** `plugins/core/steps/query-database.ts`
+
+Runs `queryDatabase(env, sql)` from the worker database helper: opens a `pg` client with `env.HYPERDRIVE.connectionString`, executes the SQL, returns `rows`, and closes the client. The SQL string is passed through `render` so you can inject template values (use with care; this is not a prepared-parameter UI).
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `sql` | textarea, required | SQL text (default `select 1 as ok`). |
+
+## Output
+
+Array of row objects from `pg` (result `rows`).
+
+## Requirements
+
+The deployed worker must provide a **Hyperdrive** binding named as expected by the worker code (`HYPERDRIVE` with `connectionString`). The core plugin also documents a **database** connection provider for app-side credential UX; the step itself uses the worker binding.
+
+## Related
+
+- `apps/web/worker/services/database.ts` for implementation details

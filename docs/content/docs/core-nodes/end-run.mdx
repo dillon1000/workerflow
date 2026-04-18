@@ -1,0 +1,28 @@
+---
+title: End run (core)
+description: |
+  Stops traversing the graph from this node: no downstream nodes run on
+  this branch.
+---
+
+- **Kind:** `endRun`
+- **Family:** `action`
+- **Step:** `plugins/core/steps/end-run.ts`
+
+Returns output containing `__workflow_end: true`. The workflow executor treats that as a signal to enqueue **no** further targets from this node, which effectively terminates this branch while other branches may still proceed if your graph structure allows.
+
+The `reason` field is template-rendered for the run history detail string.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `reason` | text, templates allowed | Optional message explaining why the branch stopped. |
+
+## Output
+
+`{ __workflow_end: true, reason: string }` (shape used by the runtime).
+
+## Related
+
+- `nextNodes` logic in `apps/web/worker/services/runtime/execution.ts`

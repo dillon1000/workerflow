@@ -1,0 +1,29 @@
+---
+title: Ask for input (core)
+description: |
+  Data node that reads answers from the run payload for button-triggered
+  flows and exposes them as step output.
+---
+
+- **Kind:** `askForInput`
+- **Family:** `data`
+- **Step:** `plugins/core/steps/ask-for-input.ts`
+
+Expects `payload.askForInput` to be an object keyed by **this node’s id** (the value is the user’s answer string). If the field is marked required and the answer is missing or blank after defaulting, the step throws and the run fails.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `label` | text, required | Human label for the prompt. |
+| `placeholder` | text | Input placeholder. |
+| `defaultValue` | text | Used when no answer is supplied. |
+| `required` | select | `true` or `false` (stored as string). |
+
+## Output
+
+Returns `value`, `label`, `placeholder`, and `required` metadata for downstream templates.
+
+## Related
+
+- [Button press](./button)

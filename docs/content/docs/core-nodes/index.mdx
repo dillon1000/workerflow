@@ -1,0 +1,50 @@
+---
+title: Core nodes
+description: |
+  Reference for built-in triggers, actions, logic, and data nodes from
+  the core plugin (plugins/core).
+---
+
+Core nodes ship with the **core** plugin (`plugins/core/index.ts`). They cover triggers, generic HTTP and AI actions, branching, PostgreSQL reads, sub-workflows, and small data-shaping steps. Each page lists the node **kind** string (stored on the graph), the **family** (library section), Inspector fields, and how the runtime behaves when that step runs.
+
+## Triggers
+
+| Page | Kind | Summary |
+| --- | --- | --- |
+| [Button press](./button) | `button` | Manual runs from the app |
+| [Schedule](./schedule) | `schedule` | Cron-based dispatch |
+| [Receive webhook](./webhook) | `webhook` | HTTP ingress with optional path suffix and shared secret |
+| [Context from parent workflow](./parent-context) | `parentContext` | Sub-workflow entry only |
+
+## Actions
+
+| Page | Kind | Summary |
+| --- | --- | --- |
+| [Wait](./wait) | `wait` | `step.sleep` for a configurable duration |
+| [Run sub-workflow](./run-subworkflow) | `runSubworkflow` | Invoke a published child workflow |
+| [Send webhook](./send-webhook) | `sendWebhook` | `fetch` to a URL with templated body |
+| [AI text](./ai-text) | `aiText` | Workers AI text generation |
+| [AI image](./ai-image) | `aiImage` | Workers AI image generation |
+| [HTTP request](./http-request) | `httpRequest` | Generic `fetch` call |
+| [End run](./end-run) | `endRun` | Stop the branch with no further downstream nodes |
+
+## Logic
+
+| Page | Kind | Summary |
+| --- | --- | --- |
+| [Condition](./condition) | `condition` | Boolean expression; true/false edges |
+
+## Data
+
+| Page | Kind | Summary |
+| --- | --- | --- |
+| [Ask for input](./ask-for-input) | `askForInput` | Collect prompt answers for button-triggered runs |
+| [Query database](./query-database) | `queryDatabase` | Run SQL against Hyperdrive PostgreSQL |
+| [Static text](./static-text) | `staticText` | Emit a templated string as output |
+| [Transform JSON](./transform-json) | `transformJson` | Build JSON from a template string |
+
+## Source layout
+
+Runtime handlers live under `plugins/core/steps/<step-id>.ts` and map from each node’s `stepId` in the manifest. Triggers do not use step files; execution records them as synthetic completed steps with the trigger payload.
+
+For adding or changing nodes, see [Plugin development](/docs/plugin-development).

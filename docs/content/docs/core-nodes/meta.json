@@ -1,0 +1,22 @@
+{
+  "title": "Core nodes",
+  "pages": [
+    "index",
+    "button",
+    "schedule",
+    "webhook",
+    "parent-context",
+    "ask-for-input",
+    "wait",
+    "run-subworkflow",
+    "send-webhook",
+    "ai-text",
+    "ai-image",
+    "condition",
+    "http-request",
+    "query-database",
+    "end-run",
+    "static-text",
+    "transform-json"
+  ]
+}

@@ -1,0 +1,31 @@
+---
+title: Send webhook (core)
+description: |
+  Outbound HTTP call with method, URL, JSON headers, and templated body;
+  response body is parsed as JSON when possible.
+---
+
+- **Kind:** `sendWebhook`
+- **Family:** `action`
+- **Step:** `plugins/core/steps/send-webhook.ts`
+
+Performs a `fetch` using the configured HTTP method. `headers` must be a JSON object string (it is parsed with `JSON.parse` after template rendering). For non-GET methods, `body` is sent as the request body text. The response body is read as text then passed through `parseMaybeJson` for downstream use.
+
+Non-success HTTP statuses mark the run step as **errored** while still returning parsed output when JSON parsing succeeds.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `method` | select, required | `GET`, `POST`, `PUT`, `PATCH`, or `DELETE`. |
+| `url` | text, required | Request URL (templates applied). |
+| `headers` | json | Defaults to JSON content-type example; must be valid JSON. |
+| `body` | textarea, templates allowed | Omitted for GET. |
+
+## Output
+
+Parsed JSON when the response is JSON; otherwise whatever `parseMaybeJson` returns.
+
+## Related
+
+- [HTTP request](./http-request) for the same fetch pattern with different defaults

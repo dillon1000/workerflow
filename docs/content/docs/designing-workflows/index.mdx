@@ -43,4 +43,4 @@ Publishing writes a **versioned** definition the worker uses for runs. Sub-workf
 
 At runtime the worker walks the graph from the trigger, executes each non-trigger node through the matching **plugin step** (or inline handler for special cases), records **step output** per node, and passes that output into template rendering for later nodes. Condition outputs choose the next nodes based on edge branch metadata.
 
-For a deeper look at how plugins supply nodes and steps, see the [Plugin Development](/docs/plugin-development) section.
+For each built-in block from the core plugin, see [Core nodes](/docs/core-nodes). For how plugins supply nodes and steps, see [Plugin development](/docs/plugin-development).

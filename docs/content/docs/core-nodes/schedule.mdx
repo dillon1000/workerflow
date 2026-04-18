@@ -1,0 +1,22 @@
+---
+title: Schedule (core)
+description: |
+  Time-based trigger using a cron expression and timezone string.
+---
+
+- **Kind:** `schedule`
+- **Family:** `trigger`
+- **Step:** none
+
+Dispatches the workflow on a recurring cadence defined by cron semantics. The worker’s scheduling integration is responsible for invoking published workflows that use this trigger.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `cron` | text, required | Cron expression (example `0 * * * *`). |
+| `timezone` | text, required | IANA-style timezone name (example `UTC`). |
+
+## Related
+
+- [Designing workflows](/docs/designing-workflows) for trigger cardinality and publish rules

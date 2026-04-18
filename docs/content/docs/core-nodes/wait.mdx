@@ -1,0 +1,27 @@
+---
+title: Wait (core)
+description: |
+  Pauses execution using Cloudflare Workflows sleep inside an inline step
+  handler.
+---
+
+- **Kind:** `wait`
+- **Family:** `action`
+- **Step:** `plugins/core/steps/wait.ts`
+- **Execution mode:** `inline` (must call `step.sleep` on the workflow handle)
+
+Sleeps for `durationSeconds` before completing. Uses the Cloudflare Workflow `step` API, so this node is registered with `executionMode: "inline"` instead of the default `step` wrapper.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `durationSeconds` | number, required, min `1` | Sleep length in seconds. |
+
+## Output
+
+Returns `{ sleptFor: number }` plus a human-readable detail string.
+
+## Related
+
+- [Plugin Steps](/docs/plugin-development/steps) for execution modes

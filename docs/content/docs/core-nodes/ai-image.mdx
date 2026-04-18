@@ -1,0 +1,26 @@
+---
+title: AI image (core)
+description: |
+  Workers AI image generation from a model id and templated prompt.
+---
+
+- **Kind:** `aiImage`
+- **Family:** `action`
+- **Step:** `plugins/core/steps/ai-image.ts`
+
+Same integration shape as **AI text**: requires `env.AI` and calls `env.AI.run` with the configured model and rendered prompt. Use an image-capable model id.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `model` | text, required | Workers AI model id (example `@cf/black-forest-labs/flux-1-schnell`). |
+| `prompt` | textarea, required, templates allowed | Image prompt after template rendering. |
+
+## Output
+
+Workers AI result object for the image request.
+
+## Related
+
+- [AI text](./ai-text)

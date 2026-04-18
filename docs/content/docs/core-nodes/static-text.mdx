@@ -1,0 +1,25 @@
+---
+title: Static text (core)
+description: |
+  Emits a string value into the outputs map for downstream template use.
+---
+
+- **Kind:** `staticText`
+- **Family:** `data`
+- **Step:** `plugins/core/steps/static-text.ts`
+
+Renders the configured `value` through the template engine (`render`) and returns it as `{ value }`. Use this to pin literals or compose strings from `{{ ... }}` references without issuing network or DB calls.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `value` | textarea, required, templates allowed | Final text after rendering. |
+
+## Output
+
+`{ value: string }`.
+
+## Related
+
+- [Transform JSON](./transform-json)

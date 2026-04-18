@@ -1,0 +1,20 @@
+/**
+ * Cloudflare Workers config for the docs app.
+ *
+ * React Router on Workers expects a server bundle plus static assets.
+ * Reference:
+ * https://developers.cloudflare.com/workers/framework-guides/web-apps/react-router/
+ */
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "workerflow-docs",
+  "main": "build/server/index.js",
+  "assets": {
+    "directory": "build/client"
+  },
+  "compatibility_date": "2026-04-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  }
+}

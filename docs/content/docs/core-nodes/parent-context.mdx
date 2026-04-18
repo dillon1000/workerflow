@@ -1,0 +1,23 @@
+---
+title: Context from parent workflow (core)
+description: |
+  Sub-workflow-only trigger that receives structured input from a parent
+  run sub-workflow step.
+---
+
+- **Kind:** `parentContext`
+- **Family:** `trigger`
+- **Step:** none
+
+Used **only** in workflows whose mode is **sub-workflow**. The parent run passes input into the child graph; templates can reference `parent.<node title>.data` shapes described in the editor.
+
+Standard workflows cannot add this node (library hides it); validators require exactly one such trigger in a sub-workflow and forbid other trigger families there.
+
+## Configuration
+
+None (`fields` is empty).
+
+## Related
+
+- [Run sub-workflow](./run-subworkflow)
+- [Designing workflows](/docs/designing-workflows)

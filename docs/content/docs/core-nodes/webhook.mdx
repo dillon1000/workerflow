@@ -1,0 +1,27 @@
+---
+title: Receive webhook (core)
+description: |
+  HTTP trigger with optional path suffix and shared secret field for
+  inbound verification patterns.
+---
+
+- **Kind:** `webhook`
+- **Family:** `trigger`
+- **Step:** none
+
+Exposes an HTTPS URL scoped to the workflow and node. External systems POST (or call) that URL to start a run. The Inspector shows the composed webhook URL for copy/paste.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `pathSuffix` | text | Optional extra path segment; must be unique per workflow when set (validator enforces no duplicates). |
+| `secretKey` | text | Optional shared secret material used by trigger verification flows where applicable. |
+
+## Validation
+
+Graph validation rejects duplicate normalized `pathSuffix` values across webhook nodes in the same workflow.
+
+## Related
+
+- [Designing workflows](/docs/designing-workflows) for graph validation overview

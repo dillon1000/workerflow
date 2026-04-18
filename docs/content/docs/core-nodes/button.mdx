@@ -1,0 +1,26 @@
+---
+title: Button press (core)
+description: |
+  Manual trigger: start a workflow from the dashboard or editor with an
+  optional custom button label.
+---
+
+- **Kind:** `button`
+- **Family:** `trigger`
+- **Step:** none (triggers are not executed as plugin steps)
+
+Starts a run when someone presses the run control in the product UI. Only **standard** workflows may use this trigger; a graph may contain exactly one trigger node.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `buttonLabel` | text, required | Label shown on the run button (default `Run workflow`). |
+
+## Payload
+
+The run’s initial `payload` comes from the trigger implementation (manual run). Downstream nodes can still template from `trigger.data` depending on how the run was started.
+
+## Related
+
+- [Ask for input](./ask-for-input) for collecting text before non-trigger steps run on button-triggered flows

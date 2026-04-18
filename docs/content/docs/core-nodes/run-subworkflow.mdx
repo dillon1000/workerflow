@@ -1,0 +1,27 @@
+---
+title: Run sub-workflow (core)
+description: |
+  Starts a published child workflow and awaits its final output object.
+---
+
+- **Kind:** `runSubworkflow`
+- **Family:** `action`
+- **Step:** `plugins/core/steps/run-subworkflow.ts`
+
+Resolves `workflowId` to a **published** sub-workflow owned by the current parent workflow, parses `input` as JSON (after template rendering), and calls `runSubworkflow` from the step context. If the child is missing or not published, the step throws.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `workflowId` | workflow, required | Published sub-workflow attached to this parent. |
+| `input` | json, required, templates allowed | Object passed as the child trigger payload (defaults include `{{ trigger.data }}` patterns). |
+
+## Output
+
+The child workflow’s terminal output object (whatever the sub-run produced as its final propagated output).
+
+## Related
+
+- [Context from parent workflow](./parent-context)
+- [Designing workflows](/docs/designing-workflows)

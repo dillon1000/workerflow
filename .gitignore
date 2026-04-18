@@ -34,3 +34,6 @@ docs/source.generated.ts
 /.claude/*
 /.claude/worktrees/
 /.claude/worktrees/**
+docs/.react-router
+docs/.source
+docs/build/

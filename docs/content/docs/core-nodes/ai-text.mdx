@@ -1,0 +1,26 @@
+---
+title: AI text (core)
+description: |
+  Workers AI text generation using a model id and templated prompt.
+---
+
+- **Kind:** `aiText`
+- **Family:** `action`
+- **Step:** `plugins/core/steps/ai-text.ts`
+
+Calls `env.AI.run(model, { prompt })` using the Cloudflare Workers AI binding. If `env.AI` is missing, the step throws.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `model` | text, required | Workers AI model id (example `@cf/meta/llama-3.3-70b-instruct-fp8-fast`). |
+| `prompt` | textarea, required, templates allowed | Prompt text after template rendering. |
+
+## Output
+
+Whatever object Workers AI returns for the `run` call (surfaced on the run step).
+
+## Related
+
+- [AI image](./ai-image)

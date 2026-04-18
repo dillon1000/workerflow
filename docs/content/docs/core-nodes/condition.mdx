@@ -1,0 +1,30 @@
+---
+title: Condition (core)
+description: |
+  Evaluates a boolean JavaScript expression against trigger data and prior
+  outputs; routing follows true or false edges.
+---
+
+- **Kind:** `condition`
+- **Family:** `logic`
+- **Step:** `plugins/core/steps/condition.ts`
+
+Runs `evaluateExpression` on the `expression` string. The step output is `{ passed: boolean }`. The worker selects outgoing edges whose `data.branch` is `"true"` or `"false"` to match that result.
+
+## Configuration
+
+| Field | Kind | Notes |
+| --- | --- | --- |
+| `expression` | textarea, required | Expression evaluated in the shared safe evaluator (example `trigger.data?.priority === "high"`). |
+
+## Graph rules
+
+Validators require **both** a true and a false branch from every condition node. In the Inspector, select the edge leaving the condition to set **Branch** to true or false.
+
+## Output
+
+`{ passed: boolean }` used only for routing; downstream nodes can still template from earlier outputs as usual.
+
+## Related
+
+- [Designing workflows](/docs/designing-workflows) for edge branching
