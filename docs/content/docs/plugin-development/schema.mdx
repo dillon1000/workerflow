@@ -1,0 +1,71 @@
+---
+title: Plugin Schema
+description: |
+  TypeScript manifest types, connection schemas, node field definitions,
+  and how the app validates plugin metadata at build time.
+---
+
+Plugin “schema” in this repo is **TypeScript-first**: contracts live in `plugins/types.ts` and are consumed by both the Vite web app and the Cloudflare worker through shared imports and `import.meta.glob` discovery.
+
+## Core interfaces
+
+### `WorkflowPluginManifest`
+
+Top-level export from `plugins/<plugin-id>/index.ts`:
+
+- `id` — must equal the folder name (`plugins/github` ⇒ `id: "github"`). `apps/web/src/lib/workflow/plugin-registry.ts` throws if the manifest id does not match the path-derived id.
+- `title` / `description` — used for grouping in UI and docs tooling.
+- `connections?` — optional array of `ConnectionSchema` entries for the Connections screen.
+- `nodes` — array of `WorkflowPluginNodeDefinition` entries that become editor nodes.
+
+### `WorkflowPluginNodeDefinition`
+
+Describes one row in the Node library and one executable or trigger node kind:
+
+- `kind` — string token stored on graph nodes (`WorkflowNodeData.kind`). Must be **globally unique** across all plugins; the registry throws on duplicates.
+- `family` — `trigger`, `action`, `logic`, or `data` (`WorkflowFamily` in `apps/web/src/lib/workflow/types.ts`). Drives React Flow node type, palette section, and validation rules (for example trigger count).
+- `title`, `subtitle`, `accent` — editor defaults for card copy and gradient styling.
+- `defaultConfig` — `Record<string, unknown>` merged into `WorkflowNodeData.config` when the user adds the node (`createNode` in `apps/web/src/lib/workflow/graph.ts`).
+- `stepId?` — filename stem under `steps/` for runnable nodes. Omitted for pure triggers and other non-executing definitions.
+- `executionMode?` — `"step"` (default) or `"inline"`; see [Plugin Steps](./steps).
+- `fields?` — optional `WorkflowNodeFieldDefinition[]` for the Inspector; see [Plugins in the Inspector](./inspector).
+
+### `WorkflowNodeFieldDefinition`
+
+Defines one config key the Inspector should edit:
+
+- `key` — property inside `node.data.config`.
+- `label`, `kind`, optional `description`, `placeholder`, `required`, numeric bounds, `options` for selects, `connectionProvider`, `allowTemplates`.
+
+Supported `kind` values are listed in the overview; validation helpers only understand those kinds.
+
+### `ConnectionSchema` and `ConnectionField`
+
+Reusable credential templates:
+
+- `provider` — stable string id; must be unique across all plugins’ `connections` arrays.
+- `title`, `description`, optional `docsUrl`, `monogram` — UI metadata.
+- `fields` — `ConnectionField` rows with `kind` in `text`, `password`, `textarea`, or `url`, plus optional `secret: true` for masked storage.
+
+The web app aggregates `connectionSchemas` from `plugin-registry.ts` for connection forms and worker-side checks (`isKnownConnectionProvider` in `plugin-runtime.ts`).
+
+## Registry behavior
+
+`plugin-registry.ts` (web) does four important things at module load:
+
+1. **Loads** every `plugins/*/index.ts` eagerly via `import.meta.glob`.
+2. **Validates** plugin id vs folder name and duplicate node `kind` values.
+3. **Flattens** nodes into `workflowNodeDefinitions` with an extra `pluginId` field for worker lookup.
+4. **Exposes** `getWorkflowNodeDefinition`, `getWorkflowTemplate`, `getConnectionSchema`, and `validateNodeConfigField` for the editor, graph validation, and worker.
+
+`apps/web/src/lib/workflow/templates.ts` simply re-exports template helpers from the registry so older imports keep working; new code can import from `@/lib/workflow/plugin-registry` directly.
+
+## Shared workflow types
+
+`WorkflowNodeKind` and `WorkflowFamily` are defined in `apps/web/src/lib/workflow/types.ts` and imported into `plugins/types.ts` so manifest `kind` / `family` values stay aligned with graph serialization and the database.
+
+## Generated index
+
+`pnpm discover-plugins` regenerates `plugins/index.ts` for tooling. It is not the runtime discovery mechanism; do not hand-edit it.
+
+For end-to-end validation rules applied to graphs (triggers, edges, cycles, field errors), see the overview’s **Validation Behavior** and `validateGraph` in `apps/web/src/lib/workflow/graph.ts`.

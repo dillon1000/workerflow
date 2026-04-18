@@ -1,32 +1,39 @@
 ---
-title: Hello World
+title: Workerflow
 description: |
-  Your first `document`
-  You'll love it!
+  Open, Cloudflare-native workflow automation: a visual editor, durable
+  execution, and integrations you wire on a canvas.
 ---
 
-Hey there! Fumadocs is the docs framework that also works on React Router!
+Workerflow is a **workflow automation** product you run yourself: a web app for designing automations on a canvas, backed by **durable execution** on **Cloudflare Workflows**. You connect triggers (manual, schedule, webhooks, or provider events), chain actions and logic, store provider credentials as reusable **connections**, and publish graphs that the worker runs reliably across retries and long-running steps.
 
-## Heading
+## What you get
 
-Hello World
+- **Visual editor** — React Flow canvas: add nodes from the library, connect edges, and configure each block in the Inspector.
+- **Durable runs** — orchestration uses Cloudflare Workflows so steps can checkpoint, retry, and use primitives like `step.sleep` where needed.
+- **Integrations** — behavior is extended through **folder-based plugins** (GitHub, Linear, Discord, AI providers, databases, outbound webhooks, and core primitives). Plugins declare nodes, Inspector fields, runtime steps, triggers, and optional connection tests without editing central worker switch statements.
+- **Connections** — secrets and provider config live in app-managed storage (encrypted where applicable), referenced from nodes by alias instead of scattering env-based API keys per workflow.
+- **Event and time** — schedule triggers, generic webhooks, and provider-specific inbound triggers (with verification hooks from plugins) complement manual runs from the dashboard.
+
+## Who it is for
+
+Teams and individuals who want **automation they control**: one codebase, Cloudflare-native hosting, and a clear path from a drawn graph to a production run with audit-friendly step output.
+
+## Where to go next
 
 <Cards>
-  <Card title="Learn more about React Router" href="https://reactrouter.com" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card
+    title="Designing workflows"
+    description="Canvas, nodes, triggers, validation, and publishing."
+    href="/docs/designing-workflows"
+  />
+  <Card
+    title="Plugin development"
+    description="Add providers and nodes with the plugin folder model."
+    href="/docs/plugin-development"
+  />
 </Cards>
 
-```ts
-console.log('I love React!');
-```
+## Stack (high level)
 
-### Heading
-
-#### Heading
-
-| Head                            | Description                         |
-| ------------------------------- | ----------------------------------- |
-| `hello`                         | Hello World                         |
-| very **important**              | Hey                                 |
-| _Surprisingly_                  | Fumadocs                            |
-| very long text that looks weird | hello world hello world hello world |
+The main app combines React, Vite, Tailwind, TanStack Router, Jotai, Drizzle, Better Auth, and Hono-style worker routes. Workflow definitions and runs are persisted for the editor and runtime; see the repository README for local setup, env layout, and `pnpm` commands.

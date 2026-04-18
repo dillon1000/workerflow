@@ -204,6 +204,15 @@ importers:
       '@ai-sdk/react':
         specifier: ^3.0.163
         version: 3.0.170(react@19.2.5)(zod@4.3.6)
+      '@fontsource/ibm-plex-mono':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/ibm-plex-sans':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/ibm-plex-serif':
+        specifier: ^5.2.7
+        version: 5.2.7
       '@openrouter/ai-sdk-provider':
         specifier: ^2.6.0
         version: 2.8.0(ai@6.0.168(zod@4.3.6))(zod@4.3.6)

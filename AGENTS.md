@@ -75,7 +75,7 @@ Do not leave the project with type errors or linting issues.
 - Adding `stepId` plus a matching `steps/<step-id>.ts` file registers runtime execution automatically.
 - Adding `trigger.ts` registers inbound trigger routing automatically.
 - Adding `test.ts` registers connection testing automatically.
-- For more information, refer to `docs/content/docs/plugin-development.mdx`
+- For more information, refer to `docs/content/docs/plugin-development/index.mdx` (Plugin Development section in the docs site)
 
 ## Secrets and Integrations
 

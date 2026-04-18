@@ -46,6 +46,6 @@ pnpm install && pnpm dev
 
 ## Adding integrations
 
-Refer to: [`docs/content/docs/plugin-development.mdx`](./docs/content/docs/plugin-development.mdx)
+Refer to: [`docs/content/docs/plugin-development/index.mdx`](./docs/content/docs/plugin-development/index.mdx) (Plugin Development docs section)
 
 ---

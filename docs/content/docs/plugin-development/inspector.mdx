@@ -1,0 +1,52 @@
+---
+title: Plugins in the Inspector
+description: |
+  How node field definitions render in the Inspector panel and reuse
+  the same validation as graph publish checks.
+---
+
+When you select a node in the workflow editor, `apps/web/src/components/editor/inspector-panel.tsx` loads the plugin definition with `getWorkflowNodeDefinition(node.data.kind)` and reads `definition.fields ?? []`. Those definitions entirely drive the **Config** section of the Inspector.
+
+## Field kinds and widgets
+
+| `field.kind` | UI control |
+| --- | --- |
+| `select` | shadcn `Select` populated from `field.options` |
+| `connection` | `Select` of connection aliases, optionally filtered by `field.connectionProvider` |
+| `workflow` | `Select` of published sub-workflows scoped to the current parent workflow |
+| `number` | Numeric `Input` respecting `min` / `max` |
+| `json` | Multiline `ReferenceField` (templates optional) |
+| `textarea` | Multiline `ReferenceField` |
+| `text` (default) | Single-line `ReferenceField` |
+
+`ReferenceField` adds picker support when `allowTemplates` is true: users can insert upstream references without typing fragile paths manually.
+
+## Template references
+
+For fields with `allowTemplates: true`, the Inspector builds a list of **strict upstream** node titles using `getAncestorNodes` from `apps/web/src/lib/workflow/graph.ts`, then offers snippets shaped like `{{ Node title.data }}`. Sub-workflows also list `{{ parent.<title>.data }}` references when applicable.
+
+Changing a node’s **Title** in the Inspector therefore changes the reference string seen by downstream nodes.
+
+## Validation parity
+
+Field-level validation uses `validateNodeConfigField` from `plugin-registry.ts`. The Inspector computes `configIssues` per field and shows inline error text under the control.
+
+The same function runs inside `validateGraph` in `graph.ts` during publish and server-side graph checks, so **the editor and publish path share one implementation**. Fixing validation bugs belongs in `validateNodeConfigField` rather than duplicating logic in the UI.
+
+Current checks include required strings, number parsing and bounds, JSON parse (skipping when template markers are present and `allowTemplates` is true), and select value membership.
+
+## Beyond plugin fields
+
+The Inspector always exposes **Title** and **Subtitle** for the selected node (stored on `WorkflowNodeData`, not in `defaultConfig`).
+
+It also renders workflow-specific affordances that are not part of `fields`:
+
+- **Edge selection** — branch picker for condition nodes (`true` / `false` on the edge’s `data.branch`).
+- **References** panel — copyable upstream tokens, independent of field definitions.
+- **Webhook URL** — computed URLs for webhook, GitHub, and Linear trigger kinds.
+- **Quick connection chips** — when the user has saved connections and the node has non-connection fields, buttons can stamp a `connectionAlias` (legacy affordance layered on top of manifest-driven selects).
+
+## Related reading
+
+- [Plugin Schema](./schema) for the `WorkflowNodeFieldDefinition` shape
+- [Nodes](./nodes) for how `config` is initialized from `defaultConfig`
