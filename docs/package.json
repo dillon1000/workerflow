@@ -17,9 +17,8 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.163",
-    "@fontsource/ibm-plex-mono": "^5.2.7",
-    "@fontsource/ibm-plex-sans": "^5.2.8",
-    "@fontsource/ibm-plex-serif": "^5.2.7",
+    "@fontsource/geist-mono": "^5.2.5",
+    "@fontsource/public-sans": "^5.2.5",
     "@openrouter/ai-sdk-provider": "^2.6.0",
     "@radix-ui/react-presence": "^1.1.5",
     "@react-router/node": "^7.14.1",
@@ -46,6 +45,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.32.3",
+    "@cloudflare/workers-types": "^4.20260418.1",
     "@react-router/dev": "^7.14.1",
     "@tailwindcss/vite": "^4.2.2",
     "@types/hast": "^3.0.4",

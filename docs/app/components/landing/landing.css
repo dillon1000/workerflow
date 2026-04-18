@@ -3,9 +3,9 @@
    ============================================================ */
 
 .wf-landing {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --font-display: "IBM Plex Serif", ui-serif, serif;
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-display: "Public Sans", ui-sans-serif, system-ui, sans-serif;
 
   --color-background: #faf9f6;
   --color-foreground: #0e0e0d;

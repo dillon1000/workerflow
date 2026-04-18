@@ -1,0 +1,44 @@
+---
+title: Editor
+description: |
+  The workflow editor: canvas, node library, Inspector, references, and runs.
+---
+
+## Layout
+
+The **editor** is built around a **React Flow** canvas:
+
+- **Node library** — browse triggers, actions, logic, and data nodes; search by title or subtitle. Drag or click to add nodes (exact interaction depends on your build; the library is the source of truth for what you can place).
+- **Canvas** — nodes as cards connected by edges. You can pan and zoom to work on large graphs.
+- **Inspector** — appears when you select a node. It shows every field defined by that node’s plugin (text, JSON, connections, schedules, and so on).
+- **Rails / panels** — your deployment may include run panels, snippets, or a command palette for quick navigation and actions.
+
+## One trigger
+
+Standard workflows allow **exactly one** trigger node. The library prevents adding a second. Sub-workflows replace that with **Context from parent workflow** as the only valid entry trigger.
+
+## Configuring nodes
+
+- Fill required fields before you can publish; the same rules apply in the Inspector and in **graph validation**.
+- Fields marked for **templates** accept placeholders that reference upstream outputs, for example values derived from `trigger` or prior node titles. Use the **References** UI where available to insert valid paths instead of guessing.
+
+## Conditions and branches
+
+For **Condition** nodes, select the outgoing **edges** to mark **true** and **false** paths. The runtime follows the branch that matches the boolean result of the configured expression.
+
+## Draft vs published
+
+Editing updates the **draft** graph. **Publishing** writes a version the worker loads for production runs. Until you publish, production triggers may still use an older definition.
+
+## Running from the editor
+
+Manual and test runs are typically available from the editor (for example a **Run** control tied to a **Button** trigger). That path is ideal for validating templates and connections before relying on schedules or webhooks.
+
+## Command palette
+
+If your build includes a **command palette**, use it to jump between workflows, nodes, or actions quickly without leaving the keyboard.
+
+## See also
+
+- [Designing workflows](/docs/designing-workflows) — validation, connections, execution model.
+- [Core nodes](/docs/core-nodes) — reference for built-in blocks.

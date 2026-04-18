@@ -1,0 +1,24 @@
+---
+title: OpenRouter
+description: |
+  Multi-provider chat completions through the OpenRouter API.
+---
+
+The **OpenRouter** plugin adds an **OpenRouter chat** node that calls OpenRouter’s chat endpoint so you can select from many upstream models with one integration.
+
+## Connection
+
+Create an **OpenRouter** connection with:
+
+- **API key** — from [OpenRouter keys](https://openrouter.ai/keys).
+- **HTTP referer** — optional; sent for attribution when OpenRouter expects it.
+- **X-Title** — optional title header for requests.
+
+## Node: OpenRouter chat
+
+- **Connection** — required.
+- **Model** — OpenRouter model string (for example `openai/gpt-4o-mini`).
+- **System prompt** and **User prompt** — same pattern as other chat nodes; templates supported where enabled.
+- **Temperature** — same range as other chat integrations.
+
+Use this when you want to switch models without changing plugins—only the model string and prompts need to change.

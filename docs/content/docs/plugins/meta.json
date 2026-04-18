@@ -1,0 +1,15 @@
+{
+  "title": "Plugins",
+  "pages": [
+    "index",
+    "core",
+    "anthropic",
+    "discord",
+    "fal",
+    "github",
+    "linear",
+    "openai",
+    "openrouter",
+    "planetscale"
+  ]
+}

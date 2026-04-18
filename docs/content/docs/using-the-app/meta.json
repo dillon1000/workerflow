@@ -1,0 +1,10 @@
+{
+  "title": "Using the app",
+  "pages": [
+    "index",
+    "dashboard-workflows",
+    "editor",
+    "connections",
+    "runs-and-settings"
+  ]
+}

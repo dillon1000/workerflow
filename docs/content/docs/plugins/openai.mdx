@@ -1,0 +1,33 @@
+---
+title: OpenAI
+description: |
+  OpenAI chat completions and image generation with an API key (and optional base URL override).
+---
+
+The **OpenAI** plugin provides **OpenAI chat** and **OpenAI image** actions that call OpenAI-compatible HTTP APIs.
+
+## Connection
+
+Create an **OpenAI** connection with:
+
+- **API key** — from [OpenAI API keys](https://platform.openai.com/api-keys).
+- **Base URL** — optional; defaults to `https://api.openai.com/v1`. Use this to point at compatible gateways or proxies.
+
+## Node: OpenAI chat
+
+- **Connection** — required.
+- **Model** — for example `gpt-4o-mini`.
+- **System prompt** — optional; templates supported.
+- **User prompt** — required; templates supported.
+- **Temperature** — sampling parameter.
+
+## Node: OpenAI image
+
+- **Connection** — required.
+- **Model** — image model id.
+- **Prompt** — required; templates supported.
+- **Size** — preset dimensions (for example `1024x1024`).
+
+## See also
+
+- [Anthropic](/docs/plugins/anthropic) and [OpenRouter](/docs/plugins/openrouter) for alternative chat providers.

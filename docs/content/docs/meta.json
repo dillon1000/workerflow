@@ -1,8 +1,10 @@
 {
   "pages": [
     "index",
+    "using-the-app",
     "designing-workflows",
     "core-nodes",
+    "plugins",
     "self-hosting",
     "plugin-development",
     "..."

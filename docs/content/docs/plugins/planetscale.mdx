@@ -1,0 +1,27 @@
+---
+title: PlanetScale
+description: |
+  Run parameterized SQL against PlanetScale using the serverless HTTP driver.
+---
+
+The **PlanetScale** plugin adds **Query PlanetScale**, a data node that executes SQL against a **PlanetScale** database using credentials you store as a connection.
+
+## Connection
+
+Create a **PlanetScale** connection with:
+
+- **Connection string** — MySQL URL (`mysql://user:pass@host/db?sslaccept=strict` style). The runtime parses host, user, password, and database from this string.
+
+See PlanetScale’s docs for [serverless driver](https://planetscale.com/docs/concepts/serverless-driver) details if you rotate passwords or branches.
+
+## Node: Query PlanetScale
+
+- **Connection** — required.
+- **SQL** — required query text; templates supported where safe for your use case.
+- **Parameters (JSON array)** — optional bound parameters as a JSON array string; templates supported.
+
+Prefer parameterized queries over string concatenation from untrusted trigger data to reduce injection risk.
+
+## See also
+
+- [Query database](/docs/core-nodes/query-database) for PostgreSQL via Hyperdrive.

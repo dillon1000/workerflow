@@ -1,0 +1,27 @@
+---
+title: Anthropic
+description: |
+  Claude chat completions using an Anthropic API connection.
+---
+
+The **Anthropic** plugin adds a **Claude chat** action node that calls the **Anthropic Messages API** using your stored API key.
+
+## Connection
+
+Create an **Anthropic** connection with:
+
+- **API key** — from the [Anthropic console](https://console.anthropic.com/settings/keys) (`sk-ant-…`).
+
+## Node: Claude chat
+
+- **Connection** — required; picks the Anthropic connection alias.
+- **Model** — text field for the model id (for example `claude-sonnet-4-5`).
+- **System prompt** — optional; supports templates.
+- **User prompt** — required; supports templates.
+- **Max tokens** — upper bound on completion length.
+
+Use this node when you want Claude directly without routing through OpenAI or OpenRouter. Step output is available to downstream nodes and template fields.
+
+## See also
+
+- [OpenAI](/docs/plugins/openai) and [OpenRouter](/docs/plugins/openrouter) for other chat providers.

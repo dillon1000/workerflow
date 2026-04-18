@@ -1,0 +1,32 @@
+---
+title: Runs and settings
+description: |
+  Workflow runs history, per-workflow settings, and user account settings.
+---
+
+## Runs
+
+Each workflow has a **runs** view at `/workflows/:workflowId/runs`. Use it to:
+
+- See **recent executions** triggered by button, schedule, webhook, or provider events.
+- Open a **single run** to inspect **step output**, errors, and timing (exact detail depends on your deployment’s UI).
+
+Runs reflect the **published** graph version that was active when the run started, plus the trigger payload. If results look stale after edits, confirm you **published** the latest draft.
+
+## Workflow settings
+
+**Workflow settings** (`/workflows/:workflowId/settings`) hold metadata and options scoped to that workflow: name, description, and any toggles your build exposes (for example sub-workflow flags or retention). Keep names and descriptions current so operators can identify graphs in lists and incident reviews.
+
+## User settings
+
+**Settings** (`/settings`) covers your **account** profile and preferences: identity tied to authentication, and UI options your deployment provides. This is separate from **connections**, which are integration credentials.
+
+## Operational tips
+
+- When debugging a failed run, trace from the trigger payload through each node’s output to find where templates or API calls diverged.
+- For long-running graphs, remember **Wait** and **Ask for input** behaviors (see [Core nodes](/docs/core-nodes)) so you interpret run state correctly.
+
+## See also
+
+- [Editor](/docs/using-the-app/editor) — running from the canvas.
+- [Designing workflows](/docs/designing-workflows) — execution and branching.

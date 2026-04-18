@@ -1,0 +1,21 @@
+---
+title: fal.ai
+description: |
+  Run fal.ai hosted models (image, video, audio) through the synchronous run API.
+---
+
+The **fal.ai** plugin adds a **fal.ai run model** action that invokes any model exposed by fal’s **synchronous run** API, given an API key and JSON input payload.
+
+## Connection
+
+Create a **fal.ai** connection with:
+
+- **API key** — from the [fal dashboard](https://fal.ai/dashboard/keys).
+
+## Node: fal.ai run model
+
+- **Connection** — required.
+- **Model** — model id string (for example `fal-ai/flux/schnell`).
+- **Input JSON** — required JSON object for that model’s input schema; supports templates inside string values.
+
+Consult fal’s documentation for each model’s input and output shape. Downstream nodes can consume the step result according to what the API returns.

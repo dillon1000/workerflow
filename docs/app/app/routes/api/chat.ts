@@ -1,6 +1,7 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
+import { cloudflareLoadContext } from '@/lib/cloudflare-context';
 import { source } from '@/lib/source';
 import { Document, type DocumentData } from 'flexsearch';
 
@@ -62,9 +63,13 @@ async function chunkedAll<O>(promises: Promise<O>[]): Promise<O[]> {
   return out;
 }
 
-const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
+function openRouterConfig(context: Route.ActionArgs['context']) {
+  const cf = context.get(cloudflareLoadContext)?.env;
+  return {
+    apiKey: cf?.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY,
+    model: cf?.OPENROUTER_MODEL ?? process.env.OPENROUTER_MODEL ?? 'google/gemini-3.1-flash-lite-preview',
+  };
+}
 
 /** System prompt, you can update it to provide more specific information */
 const systemPrompt = [
@@ -76,10 +81,23 @@ const systemPrompt = [
 
 export async function action(args: Route.ActionArgs) {
   const req = args.request;
-  const reqJson = await req.json();
+  const reqJson = (await req.json()) as { messages?: ChatUIMessage[] };
+
+  const { apiKey, model } = openRouterConfig(args.context);
+  if (!apiKey) {
+    return Response.json(
+      {
+        error:
+          'OPENROUTER_API_KEY is not set. For production run `wrangler secret put OPENROUTER_API_KEY`. For local dev add it to `.dev.vars`.',
+      },
+      { status: 503 },
+    );
+  }
+
+  const openrouter = createOpenRouter({ apiKey });
 
   const result = streamText({
-    model: openrouter.chat(process.env.OPENROUTER_MODEL ?? 'anthropic/claude-3.5-sonnet'),
+    model: openrouter.chat(model),
     stopWhen: stepCountIs(5),
     tools: {
       search: searchTool,

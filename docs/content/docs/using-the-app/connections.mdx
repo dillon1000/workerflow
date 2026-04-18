@@ -1,0 +1,38 @@
+---
+title: Connections
+description: |
+  Create and manage reusable connections, then bind them to nodes that need API access.
+---
+
+## What connections are
+
+A **connection** stores secrets and configuration for a **provider** (GitHub, Linear, OpenAI, Discord webhooks, databases, and so on). Plugins declare **connection schemas** with fields such as API keys, default owners, or webhook secrets.
+
+Nodes that call third parties declare a **connection** field tied to a provider. You choose a **connection alias** on the node; at runtime the worker resolves that alias to stored credentials.
+
+## Connections page
+
+Open **Connections** (`/connections`) to:
+
+- **Add** a new connection for a provider. Fill the fields your administrator expects (keys, URLs, optional defaults).
+- **Name** or alias the connection so you can recognize it in the Inspector picker.
+- **Test** the connection when the plugin supplies a test handler (many integrations do).
+
+Avoid scattering raw keys inside node fields when a connection exists; prefer the connection model so you can rotate secrets in one place.
+
+## Webhook secrets (GitHub, Linear)
+
+For providers that verify **inbound** webhooks, the plugin often includes a **webhook secret** field on the GitHub or Linear connection. Configure the same secret in the provider’s webhook settings and in Workerflow so delivery signatures validate. Inbound routes are handled by the worker; you do not need to put provider webhook secrets in static environment variables for those flows.
+
+## Using connections in the editor
+
+1. Create the connection on the Connections page.
+2. In the editor, select a node that requires that provider.
+3. In the Inspector, choose the connection from the **Connection** (or similarly labeled) field.
+
+If a node field is missing or invalid, **publish** validation will report it before the workflow can run in production.
+
+## Related topics
+
+- [Plugins](/docs/plugins) — per-provider connection fields and nodes.
+- [Self-hosting](/docs/self-hosting) — deployment-wide secrets and bindings.

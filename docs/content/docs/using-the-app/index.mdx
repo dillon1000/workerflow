@@ -1,0 +1,58 @@
+---
+title: Using the app
+description: |
+  Navigate the Workerflow web app: dashboard, workflows, editor, connections,
+  runs, and account settings.
+---
+
+The Workerflow **web app** is where you sign in, manage workflows, edit graphs on the canvas, configure provider connections, inspect runs, and adjust your account. After you authenticate, most work happens under the main shell with a persistent navigation pattern.
+
+## Main areas
+
+| Area | Purpose |
+| --- | --- |
+| **Dashboard** | High-level entry point and shortcuts into your workspace. |
+| **Workflows** | List, search, and open workflows; create new ones. |
+| **Editor** | Visual graph: Node library, canvas, Inspector, run controls. |
+| **Runs** | History and detail for executions of a workflow. |
+| **Connections** | Reusable credentials and endpoints keyed by provider. |
+| **Settings** | Profile and app preferences for your user. |
+
+## Typical flow
+
+1. Create or open a workflow from **Workflows** or the **Dashboard**.
+2. In the **editor**, add a **trigger** and chain **action**, **logic**, and **data** nodes from the library.
+3. Configure nodes in the **Inspector**; pick **connections** where a node calls an external API.
+4. **Validate** and **publish** when the graph is ready (see [Designing workflows](/docs/designing-workflows)).
+5. Trigger a run from the **button**, **schedule**, **webhook**, or provider event; review output under **Runs**.
+
+## Section guides
+
+<Cards>
+  <Card
+    title="Dashboard and workflows"
+    description="Lists, creation, and opening the editor."
+    href="/docs/using-the-app/dashboard-workflows"
+  />
+  <Card
+    title="Editor"
+    description="Canvas, library, Inspector, command palette, and running drafts."
+    href="/docs/using-the-app/editor"
+  />
+  <Card
+    title="Connections"
+    description="Creating aliases and linking them to nodes."
+    href="/docs/using-the-app/connections"
+  />
+  <Card
+    title="Runs and settings"
+    description="Run history, logs, workflow settings, and user settings."
+    href="/docs/using-the-app/runs-and-settings"
+  />
+</Cards>
+
+## Related documentation
+
+- [Designing workflows](/docs/designing-workflows) — graph rules, validation, and publishing.
+- [Core nodes](/docs/core-nodes) — built-in blocks from the core plugin.
+- [Plugins](/docs/plugins) — integration-specific nodes and connections.

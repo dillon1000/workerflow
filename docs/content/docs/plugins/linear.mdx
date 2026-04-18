@@ -1,0 +1,31 @@
+---
+title: Linear
+description: |
+  Linear webhook triggers and creating issues via the GraphQL API.
+---
+
+The **Linear** plugin adds a **Linear event** trigger and a **Linear create ticket** action.
+
+## Connection
+
+Create a **Linear** connection with:
+
+- **API key** — from [Linear API settings](https://linear.app/settings/api) (`lin_api_…`).
+- **Default team ID** — optional shortcut for ticket creation.
+- **Webhook secret** — for verifying **inbound** Linear webhooks (mirror this in Linear’s webhook configuration).
+
+## Trigger: Linear event
+
+Filter by **event** (for example `Issue`), **action** (for example `create`), optional **team key**, and **connection** used for signature verification.
+
+## Action: Linear create ticket
+
+Creates an issue via Linear’s API:
+
+- **Connection** — required.
+- **Team ID** — where the issue should land.
+- **Issue title** and **Description** — templates supported on typical fields exposed in the manifest.
+
+## See also
+
+- [GitHub](/docs/plugins/github) for a similar trigger plus create pattern.

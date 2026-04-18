@@ -1,0 +1,33 @@
+---
+title: Plugins
+description: |
+  Folder-based integrations that supply nodes, connections, triggers, and runtime steps.
+---
+
+Workerflow loads **plugins** from the repository’s `plugins/<plugin-id>/` directories. Each plugin contributes a **manifest**: connection types, node definitions (with Inspector fields), optional **triggers**, and **step** implementations. At build time, discovery registers everything without hand-editing central switch statements.
+
+## Installed plugins
+
+| Plugin | Role |
+| --- | --- |
+| [Core](/docs/plugins/core) | Built-in triggers, logic, HTTP, AI via Workers AI, PostgreSQL, webhooks, and data helpers. |
+| [Anthropic](/docs/plugins/anthropic) | Claude chat via the Messages API. |
+| [Discord](/docs/plugins/discord) | Post messages through Discord incoming webhooks. |
+| [fal.ai](/docs/plugins/fal) | Run hosted models through fal’s synchronous API. |
+| [GitHub](/docs/plugins/github) | Issue and pull request triggers; create issues. |
+| [Linear](/docs/plugins/linear) | Issue lifecycle triggers; create tickets. |
+| [OpenAI](/docs/plugins/openai) | Chat completions and image generation. |
+| [OpenRouter](/docs/plugins/openrouter) | Multi-provider chat through the OpenRouter gateway. |
+| [PlanetScale](/docs/plugins/planetscale) | Parameterized SQL against PlanetScale over HTTP. |
+
+## Connections
+
+Most integration plugins declare one or more **connection** providers. You create connections in the app (see [Connections](/docs/using-the-app/connections)), then select them on nodes by alias.
+
+## Extending Workerflow
+
+To add or change a plugin in source, follow [Plugin development](/docs/plugin-development) and use `pnpm create-plugin` / `pnpm discover-plugins` as described in the project guidelines.
+
+## Node reference overlap
+
+Nodes that ship with the **core** plugin are documented in detail under [Core nodes](/docs/core-nodes). This section focuses on **plugin identity**, **connections**, and **integration-specific** behavior.

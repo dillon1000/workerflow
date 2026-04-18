@@ -1,0 +1,27 @@
+---
+title: Core
+description: |
+  Built-in workflow primitives: triggers, actions, logic, data nodes, and shared connection types.
+---
+
+The **core** plugin (`id: core`) supplies most **non-integration** blocks: schedules, webhooks, HTTP, conditions, database queries against Hyperdrive-backed Postgres, Workers AI text and image nodes, sub-workflows, and more. It also defines several **connection** providers used by those nodes.
+
+## Connections
+
+| Provider | Used for |
+| --- | --- |
+| **Outbound webhook** | URL plus signing secret for [Send webhook](/docs/core-nodes/send-webhook)-style calls. |
+| **PostgreSQL database** | Hyperdrive binding name (and optional default schema) for [Query database](/docs/core-nodes/query-database). |
+| **Workers AI** | Account ID and API token for [AI text](/docs/core-nodes/ai-text) and [AI image](/docs/core-nodes/ai-image). |
+| **Custom** | Free-form base URL and API key for generic integrations. |
+
+Exact field labels match the Connections UI for each provider.
+
+## Nodes (summary)
+
+- **Triggers:** [Schedule](/docs/core-nodes/schedule), [Receive webhook](/docs/core-nodes/webhook), [Button](/docs/core-nodes/button), [Context from parent workflow](/docs/core-nodes/parent-context).
+- **Data:** [Ask for input](/docs/core-nodes/ask-for-input), [Static text](/docs/core-nodes/static-text), [Transform JSON](/docs/core-nodes/transform-json), [Query database](/docs/core-nodes/query-database).
+- **Actions:** [Wait](/docs/core-nodes/wait), [Run sub-workflow](/docs/core-nodes/run-subworkflow), [Send webhook](/docs/core-nodes/send-webhook), [HTTP request](/docs/core-nodes/http-request), [AI text](/docs/core-nodes/ai-text), [AI image](/docs/core-nodes/ai-image), [End run](/docs/core-nodes/end-run).
+- **Logic:** [Condition](/docs/core-nodes/condition).
+
+For field-level detail and runtime notes, use the [Core nodes](/docs/core-nodes) section.

@@ -1,0 +1,25 @@
+---
+title: Discord
+description: |
+  Send channel messages via Discord incoming webhooks.
+---
+
+The **Discord** plugin exposes a **Discord message** action that posts to a channel using a standard **incoming webhook URL**.
+
+## Connection
+
+Create a **Discord Webhook** connection with:
+
+- **Webhook URL** — from Discord channel settings (Integrations → Webhooks). Treat it as a secret; anyone with the URL can post as that webhook.
+
+Official Discord documentation: [Intro to Webhooks](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks).
+
+## Node: Discord message
+
+- **Connection** — required.
+- **Message content** — required; up to 2000 characters; markdown supported; templates allowed.
+- **Username** — optional override for the webhook display name.
+- **Avatar URL** — optional image URL for the message avatar.
+- **Text-to-speech** — on or off.
+
+No bot token is required for this integration path; it is webhook-only.

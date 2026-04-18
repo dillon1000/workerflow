@@ -1,0 +1,35 @@
+---
+title: Dashboard and workflows
+description: |
+  Using the dashboard and workflows list to create and open workflows.
+---
+
+## Dashboard
+
+The **dashboard** (`/dashboard`) is the default landing view after sign-in. Use it as a starting point to reach your workflows and recent activity, depending on how your deployment surfaces shortcuts.
+
+## Workflows list
+
+The **workflows** page (`/workflows`) lists workflows in your workspace. From here you can:
+
+- **Create** a new workflow. The app assigns an identifier and opens or navigates you toward editing.
+- **Open** an existing workflow to continue editing or to review metadata.
+- Move between workflows without losing your session; each workflow has its own **draft** graph and **published** version (see [Designing workflows](/docs/designing-workflows)).
+
+## Opening the editor
+
+Workflows open in the **editor** at:
+
+- `/workflows/:workflowId/editor` for a standard workflow.
+- `/workflows/:parentWorkflowId/subworkflow/:subworkflowId/editor` when editing a **sub-workflow** attached to a parent.
+
+Sub-workflows use a different trigger model (parent context only). The library and validation reflect that mode.
+
+## Naming and organization
+
+Use clear workflow names so teammates can find graphs in the list. Deeper folder or tag features, if present in your build, follow the same list and open pattern.
+
+## Next steps
+
+- [Editor](/docs/using-the-app/editor) — canvas, library, and Inspector.
+- [Designing workflows](/docs/designing-workflows) — triggers, validation, publish.

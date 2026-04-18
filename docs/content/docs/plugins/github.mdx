@@ -1,0 +1,34 @@
+---
+title: GitHub
+description: |
+  GitHub webhook triggers and creating issues with a personal access token.
+---
+
+The **GitHub** plugin provides an inbound **GitHub event** trigger and an **GitHub create issue** action.
+
+## Connection
+
+Create a **GitHub** connection with:
+
+- **Access token** — personal access token or fine-grained token with scopes appropriate for issues and webhooks.
+- **Default owner** — optional fallback org or user for API calls.
+- **Webhook secret** — shared secret for verifying **incoming** webhooks (configure the same value in the GitHub webhook settings).
+
+## Trigger: GitHub event
+
+Matches repository events delivered to your Worker’s GitHub webhook endpoint. Configure **event** (for example `issues`), **action** (for example `opened`), optional **repository** (`owner/repo`), and the **connection** that owns the webhook secret for verification.
+
+Ensure the GitHub webhook URL and secret in the repository or organization settings match what you use in Workerflow and in your deployment.
+
+## Action: GitHub create issue
+
+Creates an issue through the GitHub API:
+
+- **Connection** — required.
+- **Owner** and **Repository** — target repo.
+- **Issue title** and **Issue body** — required where marked; templates supported.
+- **Labels** and **Assignees** — optional comma-separated lists.
+
+## See also
+
+- [Connections](/docs/using-the-app/connections) for webhook secret placement.
