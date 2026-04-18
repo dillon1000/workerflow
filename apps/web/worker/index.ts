@@ -7,7 +7,7 @@ import { mountSnippetRoutes } from "./routes/snippets";
 import { mountTriggerRoutes } from "./routes/triggers";
 import { mountWorkflowRoutes } from "./routes/workflows";
 import { createAuth } from "./services/auth";
-import { createRepository } from "./services/repository";
+import { withRepository } from "./services/repository";
 import { dispatchScheduledRuns, WorkflowRunner } from "./services/runtime";
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
@@ -61,9 +61,10 @@ export default {
     env: WorkerEnv,
     ctx: ExecutionContext,
   ) {
-    const repository = await createRepository(env);
     ctx.waitUntil(
-      dispatchScheduledRuns(repository, env, controller.scheduledTime),
+      withRepository(env, async (repository) =>
+        dispatchScheduledRuns(repository, env, controller.scheduledTime),
+      ),
     );
   },
 } satisfies ExportedHandler<WorkerEnv>;

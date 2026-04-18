@@ -1,15 +1,26 @@
 import type { JsonValue, WorkflowNode } from "../../../src/lib/workflow/types";
 
+const blockedPathSegments = new Set(["__proto__", "constructor", "prototype"]);
+
+export function readProperty(source: unknown, segment: string) {
+  if (blockedPathSegments.has(segment)) {
+    return undefined;
+  }
+  if (
+    source &&
+    (typeof source === "object" || typeof source === "function") &&
+    Object.prototype.hasOwnProperty.call(source, segment)
+  ) {
+    return (source as Record<string, unknown>)[segment];
+  }
+  return undefined;
+}
+
 function readPath(source: unknown, path: string) {
   return path
     .split(".")
     .filter(Boolean)
-    .reduce<unknown>((value, segment) => {
-      if (value && typeof value === "object" && segment in value) {
-        return (value as Record<string, unknown>)[segment];
-      }
-      return undefined;
-    }, source);
+    .reduce<unknown>((value, segment) => readProperty(value, segment), source);
 }
 
 function asString(value: unknown) {

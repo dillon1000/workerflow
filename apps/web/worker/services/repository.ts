@@ -104,15 +104,33 @@ export interface Repository {
     triggerNodeId: string,
     timestamp: string,
   ): Promise<void>;
+  claimScheduleDispatch(
+    workflowId: string,
+    triggerNodeId: string,
+    timestamp: string,
+  ): Promise<boolean>;
   listSnippets(userId: string): Promise<WorkflowSnippet[]>;
   createSnippet(
     userId: string,
     input: { name: string; description: string; graph: WorkflowGraph },
   ): Promise<WorkflowSnippet>;
   deleteSnippet(userId: string, snippetId: string): Promise<void>;
+  close(): Promise<void>;
 }
 
 export async function createRepository(env: WorkerEnv): Promise<Repository> {
   const { db, client } = await createDb(env);
   return new PgRepository(db, client);
+}
+
+export async function withRepository<T>(
+  env: WorkerEnv,
+  callback: (repository: Repository) => Promise<T>,
+): Promise<T> {
+  const repository = await createRepository(env);
+  try {
+    return await callback(repository);
+  } finally {
+    await repository.close();
+  }
 }

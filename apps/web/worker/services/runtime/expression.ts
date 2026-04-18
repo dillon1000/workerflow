@@ -1,5 +1,5 @@
 import type { WorkflowNode } from "../../../src/lib/workflow/types";
-import { templateContext } from "./template";
+import { readProperty, templateContext } from "./template";
 
 type ExpressionToken = {
   type: "identifier" | "number" | "string" | "boolean" | "null" | "operator";
@@ -32,7 +32,7 @@ function tokenizeExpression(expression: string) {
       continue;
     }
 
-    if (["(", ")", "!", ".", ">", "<", ","].includes(char)) {
+    if (["(", ")", "!", ".", ">", "<"].includes(char)) {
       tokens.push({ type: "operator", value: char });
       index += 1;
       continue;
@@ -206,10 +206,7 @@ function parseExpressionValue(
             `Cannot read property "${property.value}" from empty value.`,
           );
         }
-        value =
-          typeof value === "object" || typeof value === "function"
-            ? (value as Record<string, unknown>)[property.value]
-            : undefined;
+        value = readProperty(value, property.value);
       }
 
       return value;

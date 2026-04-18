@@ -1,30 +1,48 @@
 import type { Route } from './+types/home';
-import { HomeLayout } from 'fumadocs-ui/layouts/home';
-import { Link } from 'react-router';
-import { baseOptions } from '@/lib/layout.shared';
+import '@fontsource/ibm-plex-sans/400.css';
+import '@fontsource/ibm-plex-sans/500.css';
+import '@fontsource/ibm-plex-sans/600.css';
+import '@fontsource/ibm-plex-sans/700.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import '@fontsource/ibm-plex-mono/600.css';
+import '@fontsource/ibm-plex-serif/400.css';
+import '@fontsource/ibm-plex-serif/500.css';
+import '@fontsource/ibm-plex-serif/400-italic.css';
+import '@fontsource/ibm-plex-serif/500-italic.css';
+import '../components/landing/landing.css';
+
+import { TopBar } from '../components/landing/TopBar';
+import { Hero } from '../components/landing/Hero';
+import { Modularity } from '../components/landing/Modularity';
+import { Agents } from '../components/landing/Agents';
+import { Integrations } from '../components/landing/Integrations';
+import { CTA } from '../components/landing/CTA';
+import { Footer } from '../components/landing/Footer';
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: 'New React Router App' },
-    { name: 'description', content: 'Welcome to React Router!' },
+    { title: 'Workerflow — the Cloudflare-native workflow editor' },
+    {
+      name: 'description',
+      content:
+        "A canvas for the automations you'd otherwise stitch together with cron jobs, one-off scripts, and prayer.",
+    },
   ];
 }
 
 export default function Home() {
   return (
-    <HomeLayout {...baseOptions()}>
-      <div className="p-4 flex flex-col items-center justify-center text-center flex-1">
-        <h1 className="text-xl font-bold mb-2">Fumadocs on React Router.</h1>
-        <p className="text-fd-muted-foreground mb-4">
-          The truly flexible docs framework on React.js.
-        </p>
-        <Link
-          className="text-sm bg-fd-primary text-fd-primary-foreground rounded-full font-medium px-4 py-2.5"
-          to="/docs"
-        >
-          Open Docs
-        </Link>
-      </div>
-    </HomeLayout>
+    <div className="wf-landing">
+      <TopBar />
+      <main>
+        <Hero />
+        <Modularity />
+        <Agents />
+        <Integrations />
+        <CTA />
+      </main>
+      <Footer />
+    </div>
   );
 }

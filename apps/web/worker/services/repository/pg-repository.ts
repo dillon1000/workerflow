@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import {
   createId,
   createStarterGraph,
@@ -804,6 +804,29 @@ export class PgRepository implements Repository {
           eq(workflowScheduleStateTable.triggerNodeId, triggerNodeId),
         ),
       );
+  }
+
+  async claimScheduleDispatch(
+    workflowId: string,
+    triggerNodeId: string,
+    timestamp: string,
+  ) {
+    const claimed = await this.db
+      .update(workflowScheduleStateTable)
+      .set({ lastDispatchedAt: timestamp, updatedAt: timestamp })
+      .where(
+        and(
+          eq(workflowScheduleStateTable.workflowId, workflowId),
+          eq(workflowScheduleStateTable.triggerNodeId, triggerNodeId),
+          or(
+            isNull(workflowScheduleStateTable.lastDispatchedAt),
+            ne(workflowScheduleStateTable.lastDispatchedAt, timestamp),
+          ),
+        ),
+      )
+      .returning({ id: workflowScheduleStateTable.id });
+
+    return claimed.length > 0;
   }
 
   async listSnippets(userId: string): Promise<WorkflowSnippet[]> {

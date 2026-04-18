@@ -9,6 +9,7 @@ import type {
 } from "../../src/lib/workflow/types";
 import type { WorkerEnv } from "../lib/env";
 import type { Repository } from "./repository";
+import { withRepository } from "./repository";
 import {
   executeWorkflowGraph,
   launchWorkflowRun as launchWorkflowRunImpl,
@@ -47,44 +48,44 @@ export class WorkflowRunner extends WorkflowEntrypoint<
   RunnerPayload
 > {
   async run(event: WorkflowEvent<RunnerPayload>, step: WorkflowStep) {
-    const { createRepository } = await import("~worker/services/repository");
-    const repository = await createRepository(this.env);
-    const workflow = await repository.getWorkflow(
-      event.payload.userId,
-      event.payload.workflowId,
-    );
-    if (!workflow) {
-      throw new Error("Workflow not found.");
-    }
+    return withRepository(this.env, async (repository) => {
+      const workflow = await repository.getWorkflow(
+        event.payload.userId,
+        event.payload.workflowId,
+      );
+      if (!workflow) {
+        throw new Error("Workflow not found.");
+      }
 
-    const graph = event.payload.versionId
-      ? (
-          await repository.getVersion(
-            event.payload.userId,
-            event.payload.versionId,
-          )
-        )?.definition
-      : workflow.draftGraph;
-    if (!graph) {
-      throw new Error("Workflow definition could not be resolved.");
-    }
+      const graph = event.payload.versionId
+        ? (
+            await repository.getVersion(
+              event.payload.userId,
+              event.payload.versionId,
+            )
+          )?.definition
+        : workflow.draftGraph;
+      if (!graph) {
+        throw new Error("Workflow definition could not be resolved.");
+      }
 
-    const started = Date.now();
-    const result = await executeWorkflowGraph(
-      repository,
-      this.env,
-      event.payload.userId,
-      workflow,
-      graph,
-      event.payload.runId,
-      event.payload.payload,
-      step,
-    );
-    await repository.updateRun(event.payload.userId, event.payload.runId, {
-      status: result.status,
-      finishedAt: new Date().toISOString(),
-      durationMs: Date.now() - started,
-      steps: result.steps,
+      const started = Date.now();
+      const result = await executeWorkflowGraph(
+        repository,
+        this.env,
+        event.payload.userId,
+        workflow,
+        graph,
+        event.payload.runId,
+        event.payload.payload,
+        step,
+      );
+      await repository.updateRun(event.payload.userId, event.payload.runId, {
+        status: result.status,
+        finishedAt: new Date().toISOString(),
+        durationMs: Date.now() - started,
+        steps: result.steps,
+      });
     });
   }
 }

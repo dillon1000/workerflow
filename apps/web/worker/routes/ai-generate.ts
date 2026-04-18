@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 import { z } from "zod";
 import type { WorkerEnv } from "../lib/env";
-import { createRepository } from "../services/repository";
+import { withRepository } from "../services/repository";
 import { getSecret } from "../services/secrets";
 import { requireSession } from "../services/session";
 import { workflowNodeDefinitions } from "../../src/lib/workflow/plugin-registry";
@@ -149,95 +149,96 @@ async function callAnthropic(
 export function mountAiGenerateRoutes(app: Hono<{ Bindings: WorkerEnv }>) {
   app.post("/api/workflows/generate", async (c) => {
     const session = await requireSession(c);
-    const repository = await createRepository(c.env);
     const body = generateSchema.parse(await c.req.json());
-    const connection = await repository.getConnectionByAlias(
-      session.user.id,
-      body.connectionAlias,
-    );
-    if (!connection) {
-      return c.json({ message: "Connection not found." }, 404);
-    }
-    const apiKey = await getSecret(
-      c.env,
-      session.user.id,
-      connection.id,
-      "apiKey",
-    );
-    if (!apiKey) {
-      return c.json(
-        { message: "Connection is missing an apiKey secret." },
-        400,
+    return withRepository(c.env, async (repository) => {
+      const connection = await repository.getConnectionByAlias(
+        session.user.id,
+        body.connectionAlias,
       );
-    }
-
-    const system = buildSystemPrompt();
-    let raw = "";
-    try {
-      if (connection.provider === "openai") {
-        const baseUrl =
-          String(connection.config.baseUrl ?? "").trim() ||
-          "https://api.openai.com/v1";
-        raw = await callOpenAICompatible(
-          baseUrl,
-          apiKey,
-          system,
-          body.prompt,
-          "gpt-4o-mini",
-        );
-      } else if (connection.provider === "openrouter") {
-        raw = await callOpenAICompatible(
-          "https://openrouter.ai/api/v1",
-          apiKey,
-          system,
-          body.prompt,
-          String(connection.config.model ?? "openai/gpt-4o-mini"),
-        );
-      } else if (connection.provider === "anthropic") {
-        raw = await callAnthropic(
-          apiKey,
-          system,
-          body.prompt,
-          "claude-sonnet-4-5",
-        );
-      } else {
+      if (!connection) {
+        return c.json({ message: "Connection not found." }, 404);
+      }
+      const apiKey = await getSecret(
+        c.env,
+        session.user.id,
+        connection.id,
+        "apiKey",
+      );
+      if (!apiKey) {
         return c.json(
-          {
-            message: `Provider "${connection.provider}" is not supported for generation.`,
-          },
+          { message: "Connection is missing an apiKey secret." },
           400,
         );
       }
-    } catch (error) {
-      return c.json(
-        {
-          message:
-            error instanceof Error
-              ? error.message
-              : "AI provider request failed.",
-        },
-        502,
-      );
-    }
 
-    let graph: WorkflowGraph;
-    try {
-      graph = extractJson(raw) as WorkflowGraph;
-    } catch (error) {
-      return c.json(
-        {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Could not parse model response.",
-        },
-        502,
-      );
-    }
+      const system = buildSystemPrompt();
+      let raw = "";
+      try {
+        if (connection.provider === "openai") {
+          const baseUrl =
+            String(connection.config.baseUrl ?? "").trim() ||
+            "https://api.openai.com/v1";
+          raw = await callOpenAICompatible(
+            baseUrl,
+            apiKey,
+            system,
+            body.prompt,
+            "gpt-4o-mini",
+          );
+        } else if (connection.provider === "openrouter") {
+          raw = await callOpenAICompatible(
+            "https://openrouter.ai/api/v1",
+            apiKey,
+            system,
+            body.prompt,
+            String(connection.config.model ?? "openai/gpt-4o-mini"),
+          );
+        } else if (connection.provider === "anthropic") {
+          raw = await callAnthropic(
+            apiKey,
+            system,
+            body.prompt,
+            "claude-sonnet-4-5",
+          );
+        } else {
+          return c.json(
+            {
+              message: `Provider "${connection.provider}" is not supported for generation.`,
+            },
+            400,
+          );
+        }
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "AI provider request failed.",
+          },
+          502,
+        );
+      }
 
-    return c.json({
-      graph,
-      notes: `Generated via ${connection.provider}/${connection.alias}.`,
+      let graph: WorkflowGraph;
+      try {
+        graph = extractJson(raw) as WorkflowGraph;
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not parse model response.",
+          },
+          502,
+        );
+      }
+
+      return c.json({
+        graph,
+        notes: `Generated via ${connection.provider}/${connection.alias}.`,
+      });
     });
   });
 }

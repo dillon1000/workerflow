@@ -1,12 +1,14 @@
 {
-  "name": "docs",
+  "name": "workerflow-docs",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
+    "type-check": "react-router typegen && fumadocs-mdx && tsc --noEmit",
     "types:check": "react-router typegen && fumadocs-mdx && tsc --noEmit",
+    "fix": "oxlint --fix",
     "postinstall": "fumadocs-mdx",
     "lint": "oxlint"
   },

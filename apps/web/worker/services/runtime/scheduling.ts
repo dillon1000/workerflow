@@ -15,8 +15,14 @@ function cronFieldMatches(field: string, actual: number) {
 }
 
 function cronMatches(cron: string, date: Date) {
-  const [minute = "*", hour = "*", day = "*", month = "*", weekDay = "*"] =
-    cron.split(/\s+/);
+  const fields = cron
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (fields.length !== 5) {
+    return false;
+  }
+  const [minute, hour, day, month, weekDay] = fields;
   return (
     cronFieldMatches(minute, date.getUTCMinutes()) &&
     cronFieldMatches(hour, date.getUTCHours()) &&
@@ -51,6 +57,12 @@ export async function dispatchScheduledRuns(
     const cron = String(scheduleNode.data.config.cron ?? "0 * * * *");
     if (!cronMatches(cron, now)) continue;
     const minuteKey = now.toISOString().slice(0, 16);
+    const claimed = await repository.claimScheduleDispatch(
+      workflow.id,
+      scheduleNode.id,
+      minuteKey,
+    );
+    if (!claimed) continue;
 
     await launchWorkflowRun(
       repository,
@@ -62,11 +74,6 @@ export async function dispatchScheduledRuns(
         source: "schedule",
         scheduledAt: now.toISOString(),
       },
-    );
-    await repository.markScheduleDispatch(
-      workflow.id,
-      scheduleNode.id,
-      minuteKey,
     );
   }
 }
