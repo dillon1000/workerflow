@@ -27,7 +27,7 @@ export type ChatUIMessage = UIMessage<
   }
 >;
 
-const searchServer = createSearchServer();
+let searchServerPromise: Promise<Document<CustomDocument>> | undefined;
 
 async function createSearchServer() {
   const search = new Document<CustomDocument>({
@@ -58,6 +58,11 @@ async function createSearchServer() {
   return search;
 }
 
+function getSearchServer() {
+  searchServerPromise ??= createSearchServer();
+  return searchServerPromise;
+}
+
 async function chunkedAll<O>(promises: Promise<O>[]): Promise<O[]> {
   const SIZE = 50;
   const out: O[] = [];
@@ -69,11 +74,19 @@ async function chunkedAll<O>(promises: Promise<O>[]): Promise<O[]> {
 
 function openRouterConfig(context: Route.ActionArgs['context']) {
   const cf = context.get(cloudflareLoadContext)?.env;
-  const apiKey = (cf?.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY)?.trim();
+  const apiKey = normalizeApiKey(cf?.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY);
   return {
     apiKey,
     model: cf?.OPENROUTER_MODEL ?? process.env.OPENROUTER_MODEL ?? 'google/gemini-3.1-flash-lite-preview',
   };
+}
+
+function normalizeApiKey(value: string | undefined) {
+  if (!value) return undefined;
+
+  const trimmed = value.trim().replace(/^["']|["']$/g, '');
+  const withoutBearer = trimmed.replace(/^Bearer\s+/i, '');
+  return withoutBearer || undefined;
 }
 
 function getMessageText(message: ChatUIMessage): string {
@@ -90,7 +103,7 @@ function getMessageText(message: ChatUIMessage): string {
 }
 
 async function searchDocs(query: string, limit = 6): Promise<CustomDocument[]> {
-  const search = await searchServer;
+  const search = await getSearchServer();
   const results = await search.searchAsync(query, { limit, merge: true, enrich: true });
   const entries = Array.isArray(results) ? results : [];
 
@@ -124,12 +137,13 @@ async function callOpenRouter(
   model: string,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 ) {
+  const headers = new Headers();
+  headers.set('authorization', `Bearer ${apiKey}`);
+  headers.set('content-type', 'application/json');
+
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       model,
       messages,
@@ -143,7 +157,8 @@ async function callOpenRouter(
   };
 
   if (!response.ok) {
-    throw new Error(body.error?.message ?? `OpenRouter returned ${response.status}.`);
+    const detail = body.error?.message ?? `OpenRouter returned ${response.status}.`;
+    throw new Error(`OpenRouter request failed: ${detail}`);
   }
 
   return body.choices?.[0]?.message?.content?.trim() || 'I could not generate an answer.';
@@ -229,7 +244,7 @@ const searchTool = tool({
     limit: z.number().int().min(1).max(100).default(10),
   }),
   async execute({ query, limit }) {
-    const search = await searchServer;
+    const search = await getSearchServer();
     return await search.searchAsync(query, { limit, merge: true, enrich: true });
   },
 });

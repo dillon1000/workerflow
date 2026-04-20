@@ -1,10 +1,20 @@
 import type { PropsWithChildren } from "react";
+import { DevTools } from "jotai-devtools";
+import "jotai-devtools/styles.css";
 import { Toaster } from "sonner";
 
 export function AppProviders({ children }: PropsWithChildren) {
   return (
     <>
       {children}
+      {import.meta.env.DEV ? (
+        <DevTools
+          isInitialOpen={false}
+          position="bottom-left"
+          theme="light"
+          options={{ snapshotHistoryLimit: 30 }}
+        />
+      ) : null}
       <Toaster
         position="bottom-right"
         gap={6}

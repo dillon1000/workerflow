@@ -4,10 +4,10 @@ export function CTA() {
       <div className="container">
         <div className="cta">
           <div>
-            <h2>Bring your graph.<br /><em>Ship it on your own infra.</em></h2>
-            <p>Open source. Cloudflare-native. Every workflow you build runs on your account, under your bindings — no middle layer, no per-run billing from us.</p>
+            <h2>Bring your graph.<br /><em>Ship it on your own Cloudflare Account.</em></h2>
+            <p>Open source. Cloudflare-native. Every workflow you build runs on your account, under your bindings, there's no infra to manage, no per-run billing from us.</p>
             <div className="cta-actions">
-              <a className="btn btn-lg btn-primary" href="#">
+              <a className="btn btn-lg btn-primary" href="https://workerflow-docs.dillon10.workers.dev/docs/self-hosting" target="_blank" rel="noreferrer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                 Self-host it
               </a>
@@ -34,11 +34,11 @@ export function CTA() {
               {'\n'}
               <span className="prompt">$</span> <span className="c-var">pnpm</span> dev
               {'\n'}
-              <span className="c-com">{'  ▲ vite · hono · drizzle'}</span>
+              <span className="c-com">{'  ▲ vite 6.7 ready in 3254 ms'}</span>
               {'\n'}
-              <span className="c-com">{'  ✓ http://localhost:5173'}</span>
+              <span className="c-com">{'  Local: http://localhost:5173'}</span>
               {'\n'}
-              <span className="prompt">$</span> <span className="c-var">_</span>
+              <span className="prompt">$</span> <span className="c-var">what will you build next?</span>
             </div>
           </div>
         </div>
