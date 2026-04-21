@@ -1,5 +1,3 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Client } from "pg";
 import * as schema from "../lib/schema";
 
 type HyperdriveEnv = {
@@ -9,6 +7,10 @@ type HyperdriveEnv = {
 };
 
 export async function createDb(env: HyperdriveEnv) {
+  const [{ drizzle }, { Client }] = await Promise.all([
+    import("drizzle-orm/node-postgres"),
+    import("pg"),
+  ]);
   const client = new Client({
     connectionString: env.HYPERDRIVE.connectionString,
   });
@@ -20,6 +22,7 @@ export async function createDb(env: HyperdriveEnv) {
 }
 
 export async function queryDatabase(env: HyperdriveEnv, sql: string) {
+  const { Client } = await import("pg");
   const client = new Client({
     connectionString: env.HYPERDRIVE.connectionString,
   });

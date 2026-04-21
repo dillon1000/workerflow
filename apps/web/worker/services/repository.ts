@@ -10,7 +10,6 @@ import type {
 } from "../../src/lib/workflow/types";
 import type { WorkerEnv } from "../lib/env";
 import { createDb } from "./database";
-import { PgRepository } from "./repository/pg-repository";
 
 export interface Repository {
   getBootstrap(userId: string): Promise<BootstrapPayload>;
@@ -119,6 +118,7 @@ export interface Repository {
 }
 
 export async function createRepository(env: WorkerEnv): Promise<Repository> {
+  const { PgRepository } = await import("./repository/pg-repository");
   const { db, client } = await createDb(env);
   return new PgRepository(db, client);
 }
