@@ -1,0 +1,57 @@
+---
+title: auth
+description: |
+  Merge headers, Bearer and Basic auth, and idempotency headers in
+  `plugins/lib/std/auth`.
+---
+
+`plugins/lib/std/auth.ts` centralizes header patterns so steps do not rebuild `Authorization` or idempotency keys by hand.
+
+## API
+
+| Function | Returns |
+| --- | --- |
+| `mergeHeaders(...inits)` | `Headers` — later init wins on duplicate keys. |
+| `bearerAuthHeaders(token, headers?)` | Adds `Authorization: Bearer …`. |
+| `basicAuthHeaders(username, password, headers?)` | Adds `Authorization: Basic …` via `btoa`. |
+| `applyIdempotencyHeaders(effectKey, headers?, mode?)` | Adds `X-Workflow-Effect-Key` (default) or `Idempotency-Key`. |
+
+## Example
+
+```ts
+import { bearerAuthHeaders, applyIdempotencyHeaders, mergeHeaders } from "../../lib/std/auth";
+import { buildHttpRequest, fetchJson } from "../../lib/std/http";
+
+const headers = applyIdempotencyHeaders(
+  effectKey,
+  bearerAuthHeaders(token, { "Content-Type": "application/json" }),
+);
+
+const request = buildHttpRequest(context, {
+  method: "POST",
+  url: "https://api.example.com/v1/items",
+  headers,
+  body: JSON.stringify({ name: "demo" }),
+  provider: "example",
+  operation: "items.create",
+});
+
+const { response, body } = await fetchJson(context, request);
+```
+
+## Best practices
+
+- Pass the **`effectKey`** from `executeIdempotentEffect`’s `perform` callback into **`applyIdempotencyHeaders`** so provider-side dedupe aligns with Workerflow’s ledger when you forward the header.
+- Use **`mergeHeaders`** when combining connection-derived headers with per-request headers; avoid mutating a shared `Headers` instance across parallel work.
+- For providers that only support **`Idempotency-Key`**, set `mode: "idempotency-key"`.
+
+<Callout type="info" title="Secrets stay out of traces">
+
+[observe](./observe) redacts typical auth header names when recording external calls. Still avoid putting raw tokens in `recordEvent` `data` blobs.
+
+</Callout>
+
+## See also
+
+- [http](./http) — `buildHttpRequest` + `fetchJson`.
+- [effects](./effects) — where `effectKey` is defined.

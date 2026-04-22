@@ -1,0 +1,52 @@
+---
+title: guards
+description: |
+  Assertions and lightweight validation—`assert`, non-empty strings, JSON
+  objects, byte caps—in `plugins/lib/std/guards`.
+---
+
+`plugins/lib/std/guards.ts` provides small helpers used across the stdlib and plugin steps. Failures throw ordinary **`Error`** instances (retry behavior depends on step config).
+
+## API
+
+| Function | Behavior |
+| --- | --- |
+| `assert(condition, message)` | TypeScript **`asserts condition`**. |
+| `assertNonEmptyString(value, message)` | Trims; throws if empty; returns trimmed string. |
+| `assertJsonObject(value, message)` | Ensures plain object; returns `Record<string, unknown>`. |
+| `assertMaxBytes(value, maxBytes, message)` | UTF-8 byte length via `TextEncoder`. |
+
+## Example
+
+```ts
+import { assert, assertNonEmptyString, assertJsonObject } from "../../lib/std/guards";
+
+const alias = assertNonEmptyString(
+  String(context.node.data.config.connectionAlias ?? ""),
+  "Connection alias is required.",
+);
+
+const body = assertJsonObject(
+  context.parseMaybeJson(raw),
+  "Body must be a JSON object.",
+);
+
+assert(items.length > 0, "At least one item is required.");
+```
+
+## Best practices
+
+- Prefer **specific messages**—include the field or invariant name.
+- Use **`assertJsonObject`** after `parseMaybeJson` when you expect objects; arrays should be validated separately.
+- For user-facing validation that should **not** retry, consider [fail](./fail) after detection instead of a generic assert.
+
+<Callout type="warn" title="Not a schema system">
+
+For multi-field config, [schema](./schema) often reads cleaner than a chain of asserts.
+
+</Callout>
+
+## See also
+
+- [config](./config) — `objectJsonConfig` uses `assertJsonObject` internally.
+- [limits](./limits) `assertTraceEventLimit` / `assertWorkflowOutputLimit`

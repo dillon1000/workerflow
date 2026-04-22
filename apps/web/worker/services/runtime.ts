@@ -80,11 +80,13 @@ export class WorkflowRunner extends WorkflowEntrypoint<
         event.payload.payload,
         step,
       );
-      await repository.updateRun(event.payload.userId, event.payload.runId, {
-        status: result.status,
-        finishedAt: new Date().toISOString(),
-        durationMs: Date.now() - started,
-        steps: result.steps,
+      await step.do("run:finalize", async () => {
+        await repository.updateRun(event.payload.userId, event.payload.runId, {
+          status: result.status,
+          finishedAt: new Date().toISOString(),
+          durationMs: Date.now() - started,
+        });
+        return result.status;
       });
     });
   }

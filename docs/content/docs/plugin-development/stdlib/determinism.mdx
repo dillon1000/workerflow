@@ -1,0 +1,49 @@
+---
+title: determinism
+description: |
+  Stable SHA-256 hashing, JSON fingerprints, scoped hashes, and seeded PRNG in
+  `plugins/lib/std/determinism`.
+---
+
+`plugins/lib/std/determinism.ts` supports **idempotency keys**, **effect request hashes**, and **reproducible randomness** inside steps.
+
+## API
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `stableHash(value)` | `Promise<string>` | SHA-256 hex of UTF-8 string (Web Crypto). |
+| `stableJsonHash(value)` | `Promise<string>` | `JSON.stringify` then `stableHash`. Key order follows serialization. |
+| `buildScopedHash(context, operation, value)` | `Promise<string>` | Hashes `{ workflowId: context.node.id, runId, operation, value }`. |
+| `createSeededRandom(seed)` | `() => number` | Deterministic PRNG in `[0, 1)` from a string seed. |
+
+## Example
+
+```ts
+import { stableJsonHash, buildScopedHash, createSeededRandom } from "../../lib/std/determinism";
+
+const requestHash = await stableJsonHash({ userId, action: "invite" });
+
+const dedupeKey = await buildScopedHash(context, "send-welcome-email", {
+  userId,
+});
+
+const rng = createSeededRandom(`${context.runId}:${context.node.id}`);
+const pick = Math.floor(rng() * options.length);
+```
+
+## Best practices
+
+- **`stableJsonHash`** is sensitive to object key order and undefined omission—normalize objects before hashing when providers require stability.
+- **`buildScopedHash`** embeds **`context.node.id`** under the key **`workflowId`** in the payload (historical name). It scopes to **node + run + operation**, not necessarily the workflow definition id.
+- Use **`createSeededRandom`** only when deterministic behavior across retries is **intentional**; otherwise use crypto or provider randomness.
+
+<Callout type="info" title="Effects integration">
+
+[effects](./effects) already hashes the `request` argument—use these helpers when you need ad hoc fingerprints outside the ledger.
+
+</Callout>
+
+## See also
+
+- [http](./http) `requestFingerprint`
+- [effects](./effects)

@@ -26,6 +26,8 @@ export const run: WorkflowStepRunner = async (context) => {
 
 The `WorkflowStepRunner` type and `WorkflowStepExecutionContext` live in `plugins/runtime.ts`. Prefer importing types from there so step code stays aligned with the worker.
 
+For shared parsing, HTTP, idempotent API calls, tracing, and normalized results, prefer the helpers in [`plugins/lib/std`](./std) instead of reimplementing those patterns inside each step.
+
 ## Linking manifests to files
 
 In the plugin manifest (`plugins/<plugin-id>/index.ts`), each executable node sets `stepId` to the filename stem under `steps/` (without `.ts`). Example: `stepId: "create-issue"` loads `plugins/github/steps/create-issue.ts`.
@@ -45,6 +47,7 @@ The worker constructs a context object in `apps/web/worker/services/runtime/exec
 | `runSubworkflow` | Start a published child workflow and await its output |
 | `node`, `nodes`, `payload`, `outputs` | Current graph shape, trigger input, and per-node outputs keyed by node id |
 | `step` | Cloudflare Workflow step handle (see execution modes) |
+| `stepName`, `stepConfig`, `stepContext` | Cloudflare step metadata such as name, attempt number, and resolved retry config |
 | `env` | Worker bindings (AI, Hyperdrive, and so on) |
 
 Triggers never call step runners: `executeNode` short-circuits `family === "trigger"` and records a synthetic completed step with the trigger payload as output.
@@ -57,6 +60,8 @@ Triggers never call step runners: `executeNode` short-circuits `family === "trig
 - **`inline`** — the handler runs directly with the live `step` object. Use this only when you must call Workflow APIs on that handle, for example `step.sleep(...)` in the built-in wait step (`plugins/core/steps/wait.ts`).
 
 If you pick `inline`, keep the handler short and deterministic aside from the explicit Workflow calls you need.
+
+Cloudflare handles step retries for you. If you need to tune retry behavior, do it declaratively and use `stepContext` for observability. Do not add local retry loops inside plugin code.
 
 ## Outputs and downstream templates
 

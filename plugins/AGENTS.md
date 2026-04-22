@@ -31,6 +31,7 @@ This repo’s current plugin contract is:
 - Keep `plugin.id` equal to the folder name.
 - Define reusable credentials in the manifest `connections` array.
 - Use `fetch` directly inside step files and tests. Do not add provider SDK dependencies.
+- Prefer the shared helpers in `plugins/lib/std/` over hand-rolled parsing, auth headers, error formatting, trace events, idempotent effects, and terminal failure handling.
 - Export `run: WorkflowStepRunner` from each `steps/<step-id>.ts` file.
 - Export `testConnection: ConnectionTestRunner` from `test.ts` when the provider supports connection testing.
 - Export `triggerHandlers: WorkflowTriggerHandler[]` from `trigger.ts` when the provider supports inbound webhooks.
@@ -56,3 +57,11 @@ Before finishing plugin work, run:
 pnpm type-check
 pnpm fix
 ```
+
+Cloudflare-specific guidance:
+
+- Keep steps granular.
+- Let Cloudflare handle retries.
+- Use retry configuration helpers when you need to tune retry behavior, instead of building local retry loops.
+- Throw terminal failures with `NonRetryableError` helpers when retrying would not help.
+- Log step metadata and trace events for observability.

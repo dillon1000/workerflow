@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkflowDefinition, WorkflowGraph } from "../../src/lib/workflow/types";
+import type {
+  WorkflowDefinition,
+  WorkflowEffect,
+  WorkflowGraph,
+} from "../../src/lib/workflow/types";
 import type { Repository } from "../../worker/services/repository";
 
 const mocks = vi.hoisted(() => ({
@@ -55,6 +59,7 @@ function createRepository(): Repository & {
   store: Map<string, WorkflowDefinition>;
 } {
   const store = new Map<string, WorkflowDefinition>();
+  const effects = new Map<string, WorkflowEffect>();
   const workflow = createWorkflow();
   store.set(workflow.id, workflow);
 
@@ -111,6 +116,47 @@ function createRepository(): Repository & {
     getRun: vi.fn(),
     createRun: vi.fn(),
     updateRun: vi.fn(),
+    upsertRunStep: vi.fn(),
+    claimEffect: vi.fn(async (input) => {
+      const effect: WorkflowEffect = {
+        id: `effect:${input.effectKey}`,
+        userId: input.userId,
+        runId: input.runId,
+        nodeId: input.nodeId,
+        effectKey: input.effectKey,
+        provider: input.provider,
+        operation: input.operation,
+        status: "pending",
+        requestHash: input.requestHash,
+        createdAt: "2026-04-20T00:00:00.000Z",
+        updatedAt: "2026-04-20T00:00:00.000Z",
+      };
+      effects.set(input.effectKey, effect);
+      return effect;
+    }),
+    completeEffect: vi.fn(async (input) => {
+      const current = effects.get(input.effectKey);
+      if (!current) throw new Error("Effect not found.");
+      const next: WorkflowEffect = {
+        ...current,
+        status: "complete",
+        output: input.output,
+        remoteRef: input.remoteRef,
+      };
+      effects.set(input.effectKey, next);
+      return next;
+    }),
+    failEffect: vi.fn(async (input) => {
+      const current = effects.get(input.effectKey);
+      if (!current) throw new Error("Effect not found.");
+      const next: WorkflowEffect = {
+        ...current,
+        status: "failed",
+        error: input.error,
+      };
+      effects.set(input.effectKey, next);
+      return next;
+    }),
     listConnections: vi.fn(),
     getConnectionByAlias: vi.fn(),
     getConnection: vi.fn(),
@@ -126,7 +172,7 @@ function createRepository(): Repository & {
     createSnippet: vi.fn(),
     deleteSnippet: vi.fn(),
     close: vi.fn(async () => {}),
-  } as Repository & { store: Map<string, WorkflowDefinition> };
+  } as unknown as Repository & { store: Map<string, WorkflowDefinition> };
 }
 
 function createGraph(): WorkflowGraph {

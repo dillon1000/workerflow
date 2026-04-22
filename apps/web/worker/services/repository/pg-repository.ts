@@ -8,15 +8,18 @@ import {
 import type {
   BootstrapPayload,
   ConnectionDefinition,
+  WorkflowEffect,
   WorkflowDefinition,
   WorkflowGraph,
   WorkflowMode,
   WorkflowRun,
+  WorkflowRunStep,
   WorkflowSnippet,
 } from "../../../src/lib/workflow/types";
 import {
   connectionSecretMetadataTable,
   connectionsTable,
+  workflowEffectsTable,
   workflowPublishStateTable,
   workflowRunStepsTable,
   workflowRunsTable,
@@ -31,6 +34,7 @@ import type { Repository } from "../repository";
 import { checksum } from "./checksum";
 import {
   parseConnection,
+  parseEffect,
   parseRun,
   parseVersion,
   parseWorkflow,
@@ -284,6 +288,9 @@ export class PgRepository implements Repository {
       await this.db
         .delete(workflowRunStepsTable)
         .where(inArray(workflowRunStepsTable.runId, runIds));
+      await this.db
+        .delete(workflowEffectsTable)
+        .where(inArray(workflowEffectsTable.runId, runIds));
     }
     await this.db
       .delete(workflowRunsTable)
@@ -471,30 +478,183 @@ export class PgRepository implements Repository {
         ),
       );
 
+    const updated = await this.getRun(userId, runId);
+    if (!updated) throw new Error("Updated run not found.");
+    return updated;
+  }
+
+  async upsertRunStep(_userId: string, runId: string, step: WorkflowRunStep) {
     await this.db
-      .delete(workflowRunStepsTable)
-      .where(eq(workflowRunStepsTable.runId, runId));
-    if (next.steps.length) {
-      await this.db.insert(workflowRunStepsTable).values(
-        next.steps.map((step) => ({
+      .insert(workflowRunStepsTable)
+      .values({
+        id: step.id,
+        runId,
+        nodeId: step.nodeId,
+        nodeTitle: step.nodeTitle,
+        kind: step.kind,
+        status: step.status,
+        detail: step.detail,
+        outputJson: step.output == null ? null : JSON.stringify(step.output),
+        traceJson:
+          step.traceEvents == null ? null : JSON.stringify(step.traceEvents),
+        startedAt: step.startedAt,
+        finishedAt: step.finishedAt ?? null,
+        durationMs: step.durationMs ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [workflowRunStepsTable.runId, workflowRunStepsTable.nodeId],
+        set: {
           id: step.id,
-          runId,
-          nodeId: step.nodeId,
           nodeTitle: step.nodeTitle,
           kind: step.kind,
           status: step.status,
           detail: step.detail,
           outputJson: step.output == null ? null : JSON.stringify(step.output),
+          traceJson:
+            step.traceEvents == null ? null : JSON.stringify(step.traceEvents),
           startedAt: step.startedAt,
           finishedAt: step.finishedAt ?? null,
           durationMs: step.durationMs ?? null,
-        })),
-      );
+        },
+      });
+    return step;
+  }
+
+  async claimEffect(input: {
+    userId: string;
+    runId: string;
+    nodeId: string;
+    effectKey: string;
+    provider: string;
+    operation: string;
+    requestHash: string;
+  }) {
+    const [existing] = await this.db
+      .select()
+      .from(workflowEffectsTable)
+      .where(
+        and(
+          eq(workflowEffectsTable.userId, input.userId),
+          eq(workflowEffectsTable.effectKey, input.effectKey),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      return parseEffect(existing);
     }
 
-    const updated = await this.getRun(userId, runId);
-    if (!updated) throw new Error("Updated run not found.");
-    return updated;
+    const now = new Date().toISOString();
+    await this.db
+      .insert(workflowEffectsTable)
+      .values({
+        id: createId("effect"),
+        userId: input.userId,
+        runId: input.runId,
+        nodeId: input.nodeId,
+        effectKey: input.effectKey,
+        provider: input.provider,
+        operation: input.operation,
+        status: "pending",
+        requestHash: input.requestHash,
+        outputJson: null,
+        remoteRef: null,
+        error: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing();
+
+    const [claimed] = await this.db
+      .select()
+      .from(workflowEffectsTable)
+      .where(
+        and(
+          eq(workflowEffectsTable.userId, input.userId),
+          eq(workflowEffectsTable.effectKey, input.effectKey),
+        ),
+      )
+      .limit(1);
+    if (!claimed) {
+      throw new Error("Workflow effect could not be claimed.");
+    }
+    return parseEffect(claimed);
+  }
+
+  async completeEffect(input: {
+    userId: string;
+    effectKey: string;
+    output?: WorkflowEffect["output"];
+    remoteRef?: string;
+  }) {
+    const [existing] = await this.db
+      .select()
+      .from(workflowEffectsTable)
+      .where(
+        and(
+          eq(workflowEffectsTable.userId, input.userId),
+          eq(workflowEffectsTable.effectKey, input.effectKey),
+        ),
+      )
+      .limit(1);
+    if (!existing) {
+      throw new Error("Workflow effect not found.");
+    }
+
+    await this.db
+      .update(workflowEffectsTable)
+      .set({
+        status: "complete",
+        outputJson: input.output == null ? null : JSON.stringify(input.output),
+        remoteRef: input.remoteRef ?? existing.remoteRef ?? null,
+        error: null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(workflowEffectsTable.id, existing.id));
+
+    const [updated] = await this.db
+      .select()
+      .from(workflowEffectsTable)
+      .where(eq(workflowEffectsTable.id, existing.id))
+      .limit(1);
+    if (!updated) {
+      throw new Error("Workflow effect not found after update.");
+    }
+    return parseEffect(updated);
+  }
+
+  async failEffect(input: { userId: string; effectKey: string; error: string }) {
+    const [existing] = await this.db
+      .select()
+      .from(workflowEffectsTable)
+      .where(
+        and(
+          eq(workflowEffectsTable.userId, input.userId),
+          eq(workflowEffectsTable.effectKey, input.effectKey),
+        ),
+      )
+      .limit(1);
+    if (!existing) {
+      throw new Error("Workflow effect not found.");
+    }
+
+    await this.db
+      .update(workflowEffectsTable)
+      .set({
+        status: "failed",
+        error: input.error,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(workflowEffectsTable.id, existing.id));
+
+    const [updated] = await this.db
+      .select()
+      .from(workflowEffectsTable)
+      .where(eq(workflowEffectsTable.id, existing.id))
+      .limit(1);
+    if (!updated) {
+      throw new Error("Workflow effect not found after failure update.");
+    }
+    return parseEffect(updated);
   }
 
   async listConnections(userId: string) {

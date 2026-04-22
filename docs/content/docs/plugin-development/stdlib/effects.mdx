@@ -1,0 +1,77 @@
+---
+title: effects
+description: |
+  `executeIdempotentEffect`—claim, perform, complete or replay external work
+  across step retries in `plugins/lib/std/effects`.
+---
+
+`plugins/lib/std/effects.ts` implements the Workerflow **effect ledger**: `claimEffect`, `completeEffect`, and `failEffect` on `context.repository`. Use it whenever a retry could otherwise duplicate a paid or mutating API call.
+
+## How it works
+
+1. **`request`** is hashed with `stableJsonHash` to form part of **`effectKey`**: `` `${runId}:${nodeId}:${provider}:${operation}:${requestHash}` ``.
+2. **`claimEffect`** returns either a completed effect (replay) or an incomplete claim.
+3. On first completion, **`perform(effectKey)`** runs, then **`completeEffect`** stores output and optional **`remoteRef`**.
+4. On throw, **`failEffect`** records the error and the error is rethrown.
+
+Trace events: `effect.claimed`, `effect.replayed`, `effect.completed`, `effect.failed`.
+
+## API
+
+```ts
+executeIdempotentEffect(context, {
+  provider: string;
+  operation: string;
+  request: unknown;
+  remoteRef?: (output: TOutput) => string | undefined;
+  perform: (effectKey: string) => Promise<TOutput>;
+});
+```
+
+## Example
+
+```ts
+import { executeIdempotentEffect } from "../../lib/std/effects";
+import { buildHttpRequest, fetchJson } from "../../lib/std/http";
+import { applyIdempotencyHeaders, bearerAuthHeaders } from "../../lib/std/auth";
+
+const result = await executeIdempotentEffect(context, {
+  provider: "stripe",
+  operation: "customers.create",
+  request: { email, name },
+  remoteRef: (out) => out.id,
+  perform: async (effectKey) => {
+    const request = buildHttpRequest(context, {
+      method: "POST",
+      url: "https://api.stripe.com/v1/customers",
+      headers: applyIdempotencyHeaders(
+        effectKey,
+        bearerAuthHeaders(secretKey),
+      ),
+      body: new URLSearchParams({ email, name }),
+      provider: "stripe",
+      operation: "customers.create",
+    });
+    const { response, body } = await fetchJson(context, request);
+    if (!response.ok) throw new Error(`Stripe ${response.status}`);
+    return body as { id: string };
+  },
+});
+```
+
+## Best practices
+
+- **`request` must include every input that defines “same operation”**—omit dynamic noise (timestamps) unless the provider requires it.
+- Forward **`effectKey`** to the provider when possible via [auth](./auth) **`applyIdempotencyHeaders`**.
+- Use **`remoteRef`** when the provider returns a stable id you want stored on the effect row for support tooling.
+
+<Callout type="success" title="Retries">
+
+Cloudflare Workflows may rerun the step. A completed effect short-circuits **`perform`** and returns the stored output, so duplicates do not hit the network.
+
+</Callout>
+
+## See also
+
+- [reconcile](./reconcile) — lookup-before-create on top of effects.
+- [Concept: Idempotent effects](/docs/concepts/idempotent-effects)

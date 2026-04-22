@@ -1,0 +1,60 @@
+---
+title: Durable Execution
+description: |
+  How Workerflow maps authored graphs onto Cloudflare Workflows and why
+  step boundaries matter.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+Workerflow authors build a **graph**, but the runtime executes a sequence of **workflow steps**. That distinction matters because Cloudflare Workflows can replay orchestration code after checkpoints.
+
+## Mental model
+
+<Steps>
+  <Step>
+
+### Author a graph
+
+Users connect trigger, action, logic, and data nodes in the editor.
+
+  </Step>
+  <Step>
+
+### Resolve node runners
+
+At runtime, each executable node resolves to a plugin step handler.
+
+  </Step>
+  <Step>
+
+### Execute at step boundaries
+
+Default nodes run inside `step.do(...)`. Special primitives like `step.sleep(...)` use `executionMode: "inline"`.
+
+  </Step>
+  <Step>
+
+### Persist deterministic output
+
+Each completed node is written back as a deterministic step snapshot so retries do not require rewriting the entire run record.
+
+  </Step>
+</Steps>
+
+## Why orchestration code must stay boring
+
+Anything outside `step.do(...)` can happen more than once after a workflow replay. That means orchestration code should mostly do these things:
+
+- choose the next node
+- construct step context
+- update in-memory outputs for the current run
+- hand side effects to step-scoped code
+
+If you need to write durable state, do it from inside a workflow step or via a step-scoped persistence helper.
+
+## Related docs
+
+- [Plugin Steps](/docs/plugin-development/steps)
+- [Core Nodes](/docs/core-nodes)
+- [Idempotent Effects](/docs/concepts/idempotent-effects)

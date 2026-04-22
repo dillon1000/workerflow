@@ -1,0 +1,56 @@
+---
+title: pagination
+description: |
+  Cursor pagination helpers and `collectPaginated` in `plugins/lib/std/pagination`.
+---
+
+`plugins/lib/std/pagination.ts` helps fetch multiple pages from cursor-based APIs without unbounded loops.
+
+## Types
+
+```ts
+interface PaginationPage<TItem, TCursor = string | null> {
+  items: TItem[];
+  nextCursor?: TCursor;
+}
+```
+
+## API
+
+| Function | Behavior |
+| --- | --- |
+| `collectPaginated({ initialCursor?, maxPages?, getPage })` | Repeatedly calls **`getPage`** until no **`nextCursor`** or **`maxPages`** reached. |
+| `cursorPage(items, nextCursor?)` | Convenience wrapper returning **`PaginationPage`**. |
+
+**`maxPages`** defaults to 10 and is passed through [limits](./limits) **`normalizePageSize`** with fallback 10 and max **100**—so between **1 and 100** pages.
+
+## Example
+
+```ts
+import { collectPaginated, cursorPage } from "../../lib/std/pagination";
+
+const allRows = await collectPaginated({
+  maxPages: 5,
+  getPage: async (cursor) => {
+    const { rows, next } = await api.list({ cursor, limit: 50 });
+    return cursorPage(rows, next ?? undefined);
+  },
+});
+```
+
+## Best practices
+
+- Always set **`maxPages`** for user-triggered workflows so a provider bug cannot loop forever.
+- Keep **`getPage` deterministic** per cursor so retries do not skip or duplicate items unexpectedly.
+- Return **`undefined` `nextCursor`** on the final page—**`collectPaginated`** stops when **`nextCursor`** is falsy.
+
+<Callout type="warn" title="Cost and time">
+
+Each page is an awaited network call. Balance **`maxPages`** with Worker CPU/time limits and provider rate limits.
+
+</Callout>
+
+## See also
+
+- [limits](./limits) `normalizePageSize` for per-request `limit` fields
+- [http](./http) for individual requests

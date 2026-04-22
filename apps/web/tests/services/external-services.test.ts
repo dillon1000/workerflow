@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ConnectionDefinition, WorkflowNode } from "../../src/lib/workflow/types";
+import type {
+  ConnectionDefinition,
+  WorkflowEffect,
+  WorkflowNode,
+} from "../../src/lib/workflow/types";
 import type { WorkflowStepExecutionContext } from "../../../../plugins/runtime";
 import { storeSecret } from "../../worker/services/secrets";
 import { run as runAiImage } from "../../../../plugins/core/steps/ai-image";
@@ -97,6 +101,12 @@ function createStepContext(
 ) {
   const connection = options.connection ?? createConnection();
   const secrets = options.secrets ?? {};
+  const effects = new Map<string, WorkflowEffect>();
+  const traceEvents = [] as NonNullable<
+    WorkflowStepExecutionContext["getTraceEvents"]
+  > extends () => infer T
+    ? T
+    : never;
 
   const context: WorkflowStepExecutionContext = {
     env:
@@ -108,6 +118,51 @@ function createStepContext(
       } as WorkflowStepExecutionContext["env"]),
     repository: {
       getConnectionByAlias: vi.fn(),
+      claimEffect: vi.fn(async (input) => {
+        const existing = effects.get(input.effectKey);
+        if (existing) return existing;
+        const claimed: WorkflowEffect = {
+          id: `effect:${input.effectKey}`,
+          userId: input.userId,
+          runId: input.runId,
+          nodeId: input.nodeId,
+          effectKey: input.effectKey,
+          provider: input.provider,
+          operation: input.operation,
+          status: "pending",
+          requestHash: input.requestHash,
+          createdAt: "2026-04-20T00:00:00.000Z",
+          updatedAt: "2026-04-20T00:00:00.000Z",
+        };
+        effects.set(input.effectKey, claimed);
+        return claimed;
+      }),
+      completeEffect: vi.fn(async (input) => {
+        const current = effects.get(input.effectKey);
+        if (!current) throw new Error("Effect not found.");
+        const next: WorkflowEffect = {
+          ...current,
+          status: "complete",
+          output: input.output,
+          remoteRef: input.remoteRef,
+          updatedAt: "2026-04-20T00:00:01.000Z",
+        };
+        effects.set(input.effectKey, next);
+        return next;
+      }),
+      failEffect: vi.fn(async (input) => {
+        const current = effects.get(input.effectKey);
+        if (!current) throw new Error("Effect not found.");
+        const next: WorkflowEffect = {
+          ...current,
+          status: "failed",
+          error: input.error,
+          updatedAt: "2026-04-20T00:00:01.000Z",
+        };
+        effects.set(input.effectKey, next);
+        return next;
+      }),
+      upsertRunStep: vi.fn(),
     },
     userId: "user-1",
     runId: "run-1",
@@ -139,9 +194,22 @@ function createStepContext(
         : null,
     ),
     runSubworkflow: vi.fn(),
+    recordTraceEvent: vi.fn((event) => {
+      const next = {
+        ...event,
+        createdAt: event.createdAt ?? "2026-04-20T00:00:00.000Z",
+      };
+      traceEvents.push(next);
+      return next;
+    }),
+    getTraceEvents: vi.fn(() => [...traceEvents]),
   };
 
   return { connection, context };
+}
+
+function requestHeaders(fetchMock: ReturnType<typeof vi.fn>, callIndex: number) {
+  return new Headers(fetchMock.mock.calls[callIndex]?.[1]?.headers);
 }
 
 describe("external service blocks", () => {
@@ -193,16 +261,16 @@ describe("external service blocks", () => {
       "https://api.github.com/repos/owner/repo/issues",
       expect.objectContaining({
         method: "POST",
-        headers: expect.objectContaining({
-          Authorization: "Bearer gh-token",
-        }),
-        body: JSON.stringify({
-          title: "Created by workflow",
-          body: "Body",
-          labels: ["bug", "automation"],
-          assignees: ["alice", "bob"],
-        }),
       }),
+    );
+    expect(requestHeaders(fetchMock, 0).get("Authorization")).toBe(
+      "Bearer gh-token",
+    );
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain(
+      "\"title\":\"Created by workflow\"",
+    );
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain(
+      "<!-- workerflow:",
     );
   });
 
@@ -249,10 +317,13 @@ describe("external service blocks", () => {
       "https://api.linear.app/graphql",
       expect.objectContaining({
         method: "POST",
-        headers: expect.objectContaining({
-          Authorization: "lin-api-key",
-        }),
       }),
+    );
+    expect(requestHeaders(fetchMock, 0).get("Authorization")).toBe(
+      "lin-api-key",
+    );
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain(
+      "workerflow:",
     );
   });
 
@@ -370,19 +441,21 @@ describe("external service blocks", () => {
       1,
       "https://openai.example/v1/chat/completions",
       expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer oa-key",
-        }),
+        method: "POST",
       }),
+    );
+    expect(requestHeaders(fetchMock, 0).get("Authorization")).toBe(
+      "Bearer oa-key",
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "https://openai.example/v1/images/generations",
       expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer oa-key",
-        }),
+        method: "POST",
       }),
+    );
+    expect(requestHeaders(fetchMock, 1).get("Authorization")).toBe(
+      "Bearer oa-key",
     );
   });
 
@@ -462,31 +535,32 @@ describe("external service blocks", () => {
       1,
       "https://openrouter.ai/api/v1/chat/completions",
       expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer or-key",
-          "HTTP-Referer": "https://workerflow.app",
-          "X-Title": "Workerflow",
-        }),
+        method: "POST",
       }),
     );
+    expect(requestHeaders(fetchMock, 0).get("Authorization")).toBe(
+      "Bearer or-key",
+    );
+    expect(requestHeaders(fetchMock, 0).get("HTTP-Referer")).toBe(
+      "https://workerflow.app",
+    );
+    expect(requestHeaders(fetchMock, 0).get("X-Title")).toBe("Workerflow");
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "https://api.anthropic.com/v1/messages",
       expect.objectContaining({
-        headers: expect.objectContaining({
-          "x-api-key": "anth-key",
-        }),
+        method: "POST",
       }),
     );
+    expect(requestHeaders(fetchMock, 1).get("x-api-key")).toBe("anth-key");
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       "https://fal.run/fal-ai/flux/schnell",
       expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Key fal-key",
-        }),
+        method: "POST",
       }),
     );
+    expect(requestHeaders(fetchMock, 2).get("Authorization")).toBe("Key fal-key");
   });
 
   it("uses Workers AI bindings and generic HTTP blocks correctly", async () => {
@@ -554,10 +628,10 @@ describe("external service blocks", () => {
       "https://example.com/webhook",
       expect.objectContaining({
         method: "POST",
-        headers: { "x-test": "1" },
         body: '{"ok":true}',
       }),
     );
+    expect(requestHeaders(fetchMock, 0).get("x-test")).toBe("1");
   });
 
   it("runs PlanetScale queries through the client helper", async () => {

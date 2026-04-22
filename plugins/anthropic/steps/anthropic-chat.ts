@@ -1,4 +1,9 @@
 import type { WorkflowStepRunner } from "../../runtime";
+import { requireConnection, requireSecret } from "../../lib/std/connections";
+import { numberConfig, renderedStringConfig } from "../../lib/std/config";
+import { executeIdempotentEffect } from "../../lib/std/effects";
+import { buildHttpRequest, fetchJson } from "../../lib/std/http";
+import { ok } from "../../lib/std/result";
 
 interface AnthropicMessageResponse {
   content?: { type: string; text?: string }[];
@@ -6,54 +11,67 @@ interface AnthropicMessageResponse {
   error?: { type?: string; message?: string };
 }
 
-export const run: WorkflowStepRunner = async ({
-  getConnection,
-  getConnectionSecret,
-  node,
-  render,
-}) => {
-  const connection = await getConnection(
-    String(node.data.config.connectionAlias ?? ""),
+export const run: WorkflowStepRunner = async (context) => {
+  const connection = await requireConnection(context);
+  const apiKey = await requireSecret(
+    context,
+    connection,
+    "apiKey",
+    "Anthropic connection is missing an apiKey secret.",
   );
-  const apiKey = await getConnectionSecret(connection, "apiKey");
-  if (!apiKey) {
-    throw new Error("Anthropic connection is missing an apiKey secret.");
-  }
 
-  const model = String(node.data.config.model ?? "claude-sonnet-4-6");
-  const system = render(String(node.data.config.system ?? "")).trim();
-  const prompt = render(String(node.data.config.prompt ?? ""));
-  const maxTokens = Number(node.data.config.maxTokens ?? 1024);
+  const model = String(context.node.data.config.model ?? "claude-sonnet-4-6");
+  const system = renderedStringConfig(context, "system").trim();
+  const prompt = renderedStringConfig(context, "prompt");
+  const maxTokens = numberConfig(context, "maxTokens", 1024);
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
+  const output = await executeIdempotentEffect<{
+    content: string;
+    usage: unknown;
+    raw: AnthropicMessageResponse;
+  }>(context, {
+    provider: "anthropic",
+    operation: "messages",
+    request: { model, system, prompt, maxTokens },
+    perform: async (effectKey) => {
+      const request = buildHttpRequest(context, {
+        method: "POST",
+        url: "https://api.anthropic.com/v1/messages",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "Idempotency-Key": effectKey,
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: Number.isFinite(maxTokens) ? maxTokens : 1024,
+          system: system || undefined,
+          messages: [{ role: "user", content: prompt }],
+        }),
+        provider: "anthropic",
+        operation: "messages",
+      });
+      const { response, body } = await fetchJson<AnthropicMessageResponse>(
+        context,
+        request,
+      );
+      if (!response.ok) {
+        throw new Error(
+          body.error?.message ?? `Anthropic returned ${response.status}.`,
+        );
+      }
+
+      return {
+        content: (body.content ?? [])
+          .filter((part) => part.type === "text")
+          .map((part) => part.text ?? "")
+          .join("\n"),
+        usage: body.usage ?? null,
+        raw: body,
+      };
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: Number.isFinite(maxTokens) ? maxTokens : 1024,
-      system: system || undefined,
-      messages: [{ role: "user", content: prompt }],
-    }),
   });
 
-  const body = (await response.json()) as AnthropicMessageResponse;
-  if (!response.ok) {
-    throw new Error(
-      body.error?.message ?? `Anthropic returned ${response.status}.`,
-    );
-  }
-
-  const content = (body.content ?? [])
-    .filter((part) => part.type === "text")
-    .map((part) => part.text ?? "")
-    .join("\n");
-
-  return {
-    detail: "Anthropic message completed.",
-    output: { content, usage: body.usage, raw: body },
-  };
+  return ok("Anthropic message completed.", output);
 };

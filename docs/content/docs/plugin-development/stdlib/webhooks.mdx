@@ -1,0 +1,58 @@
+---
+title: webhooks
+description: |
+  HMAC-SHA256 sign and verify helpers for webhook payloads in
+  `plugins/lib/std/webhooks`.
+---
+
+`plugins/lib/std/webhooks.ts` signs raw payload strings and verifies signatures using **Web Crypto** (`HMAC` + **SHA-256**). It composes with [auth](./auth) **`mergeHeaders`** for outbound signed requests.
+
+## API
+
+| Function | Behavior |
+| --- | --- |
+| `signWebhookPayload(secret, payload)` | Hex digest of HMAC-SHA256(secret, payload). |
+| `signedWebhookHeaders(secret, payload, headers?, headerName?)` | Adds header (default **`X-Workflow-Signature`**) with signature. |
+| `verifyWebhookSignature({ secret, payload, signature })` | Asserts signature present and matches expected digest. |
+
+## Example (outbound)
+
+```ts
+import { signedWebhookHeaders } from "../../lib/std/webhooks";
+
+const rawBody = JSON.stringify(event);
+const headers = await signedWebhookHeaders(sharedSecret, rawBody, {
+  "Content-Type": "application/json",
+});
+```
+
+## Example (inbound verification)
+
+Typically in **`trigger.ts`** or route handlers, not arbitrary steps:
+
+```ts
+import { verifyWebhookSignature } from "../../lib/std/webhooks";
+
+await verifyWebhookSignature({
+  secret: webhookSecret,
+  payload: rawBody,
+  signature: request.headers.get("X-Workflow-Signature"),
+});
+```
+
+## Best practices
+
+- Sign the **exact raw bytes** the receiver will verify—avoid re-stringifying JSON with different spacing.
+- Choose a **custom `headerName`** if the provider specifies one (e.g. `X-Hub-Signature-256`).
+- Use **`verifyWebhookSignature`** early; throw or return 401 before parsing large JSON on invalid signatures.
+
+<Callout type="warn" title="Timing attacks">
+
+This helper uses plain string compare. For high-risk public endpoints, consider constant-time comparison utilities if your runtime exposes them.
+
+</Callout>
+
+## See also
+
+- [auth](./auth) — header merging used by `signedWebhookHeaders`
+- [Plugin development guide](../index) — trigger plugins and inbound verification

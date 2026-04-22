@@ -1,10 +1,12 @@
 import type {
   BootstrapPayload,
   ConnectionDefinition,
+  WorkflowEffect,
   WorkflowDefinition,
   WorkflowGraph,
   WorkflowMode,
   WorkflowRun,
+  WorkflowRunStep,
   WorkflowSnippet,
   WorkflowVersion,
 } from "../../src/lib/workflow/types";
@@ -54,6 +56,31 @@ export interface Repository {
     runId: string,
     patch: Partial<WorkflowRun>,
   ): Promise<WorkflowRun>;
+  upsertRunStep(
+    userId: string,
+    runId: string,
+    step: WorkflowRunStep,
+  ): Promise<WorkflowRunStep>;
+  claimEffect(input: {
+    userId: string;
+    runId: string;
+    nodeId: string;
+    effectKey: string;
+    provider: string;
+    operation: string;
+    requestHash: string;
+  }): Promise<WorkflowEffect>;
+  completeEffect(input: {
+    userId: string;
+    effectKey: string;
+    output?: WorkflowEffect["output"];
+    remoteRef?: string;
+  }): Promise<WorkflowEffect>;
+  failEffect(input: {
+    userId: string;
+    effectKey: string;
+    error: string;
+  }): Promise<WorkflowEffect>;
   listConnections(userId: string): Promise<ConnectionDefinition[]>;
   getConnectionByAlias(
     userId: string,

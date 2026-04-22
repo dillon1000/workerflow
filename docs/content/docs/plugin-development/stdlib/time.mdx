@@ -1,0 +1,46 @@
+---
+title: time
+description: |
+  ISO timestamps, duration parsing, and workflow sleep bounds in
+  `plugins/lib/std/time`.
+---
+
+`plugins/lib/std/time.ts` supports the built-in wait step and any step that reads **durations** from config with **workflow-safe bounds**.
+
+## API
+
+| Export | Purpose |
+| --- | --- |
+| `MAX_SLEEP_SECONDS` | `30 * 60` — maximum supported sleep duration (seconds). |
+| `nowIso()` | `new Date().toISOString()`. |
+| `readDurationSeconds(value, fallback?)` | Parses number; throws if not finite (default fallback 60). |
+| `validateWorkflowSleepSeconds(seconds)` | Asserts `>= 1` and `<= MAX_SLEEP_SECONDS`. |
+
+## Example (wait-style step)
+
+```ts
+import { readDurationSeconds, validateWorkflowSleepSeconds } from "../../lib/std/time";
+import { ok } from "../../lib/std/result";
+
+const raw = readDurationSeconds(context.node.data.config.seconds, 60);
+const seconds = validateWorkflowSleepSeconds(raw);
+await context.step.sleep(`${seconds} seconds`);
+return ok(`Waited ${seconds}s.`);
+```
+
+## Best practices
+
+- Always run **`validateWorkflowSleepSeconds`** after reading user/config input so graph publishes cannot request absurd sleeps.
+- Use **`nowIso`** for trace timestamps when you need a string; remember wall clocks can move (NTP) but are fine for logging.
+- Align custom long-running logic with **`MAX_SLEEP_SECONDS`** so behavior matches platform limits.
+
+<Callout type="info" title="Inline execution">
+
+Steps that call **`step.sleep`** should use **`executionMode: "inline"`** per [Plugin Steps](../steps).
+
+</Callout>
+
+## See also
+
+- [limits](./limits) `assertWorkflowTimeoutSeconds`
+- [guards](./guards)

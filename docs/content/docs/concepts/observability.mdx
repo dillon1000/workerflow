@@ -1,0 +1,54 @@
+---
+title: Observability
+description: |
+  How run history and trace events complement each other in Workerflow.
+---
+
+Workerflow now has two related but different observability layers:
+
+- **run steps**: durable, user-facing workflow history
+- **trace events**: smaller internal events attached to step execution
+
+## Run steps vs trace events
+
+| Layer | Purpose |
+| --- | --- |
+| `workflow_runs` / `workflow_run_steps` | What ran, whether it completed, and what it returned |
+| per-step trace events | How a step got there: requests, responses, effect claims, retries, failures |
+
+Run history answers:
+
+- which node ran?
+- what did it output?
+- did the run complete?
+
+Trace events answer:
+
+- which HTTP request was built?
+- was an effect replayed or executed?
+- what provider call failed?
+- where did the step spend its time?
+
+## Good trace events
+
+Useful events are small, structured, and safe to persist:
+
+- `step.started`
+- `step.completed`
+- `step.failed`
+- `effect.claimed`
+- `effect.replayed`
+- `effect.completed`
+- `http.request`
+- `http.response`
+- `step.metadata`
+- `cloudflare.metric-hint`
+
+Avoid dumping raw secrets, giant payloads, or entire provider responses into traces.
+
+Cloudflare also exposes Workflow-level and step-level analytics in the dashboard and GraphQL analytics API, including labels such as `WORKFLOW_START`, `STEP_SUCCESS`, and `ATTEMPT_FAILURE`. Workerflow’s trace layer can record metric-hint events that line up with that vocabulary, but it does not replace Cloudflare’s platform metrics.
+
+## Related docs
+
+- [Idempotent Effects](/docs/concepts/idempotent-effects)
+- [Plugin Standard Library](/docs/plugin-development/std)

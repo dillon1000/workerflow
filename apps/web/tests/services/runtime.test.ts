@@ -144,6 +144,7 @@ describe("workflow runtime", () => {
         },
       } as never,
       {
+        do: vi.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
         sleep: vi.fn(async () => {}),
       } as never,
     );
@@ -158,12 +159,6 @@ describe("workflow runtime", () => {
       "run-integration",
       expect.objectContaining({
         status: "complete",
-        steps: expect.arrayContaining([
-          expect.objectContaining({
-            id: "step-1",
-            kind: "webhook",
-          }),
-        ]),
       }),
     );
   });

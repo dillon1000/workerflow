@@ -1,0 +1,58 @@
+---
+title: reconcile
+description: |
+  `executeReconciledEffect`—try an existing remote object before running an
+  idempotent create in `plugins/lib/std/reconcile`.
+---
+
+`plugins/lib/std/reconcile.ts` wraps [effects](./effects) with a **`reconcile`** hook: if the remote world already has the resource, return it without claiming a new effect.
+
+## API
+
+```ts
+executeReconciledEffect(context, {
+  provider: string;
+  operation: string;
+  request: unknown;
+  reconcile: () => Promise<TOutput | null>;
+  perform: (effectKey: string) => Promise<TOutput>;
+  remoteRef?: (output: TOutput) => string | undefined;
+});
+```
+
+- If **`reconcile()`** returns non-null, that value is returned immediately and trace **`effect.reconciled`** is recorded.
+- If **`reconcile()`** returns null, behavior matches **`executeIdempotentEffect`**.
+
+## Example
+
+```ts
+import { executeReconciledEffect } from "../../lib/std/reconcile";
+
+const workspace = await executeReconciledEffect(context, {
+  provider: "example",
+  operation: "ensure-workspace",
+  request: { slug },
+  reconcile: async () => {
+    const existing = await findWorkspaceBySlug(slug);
+    return existing;
+  },
+  perform: async (effectKey) => createWorkspace(slug, effectKey),
+});
+```
+
+## Best practices
+
+- Keep **`reconcile` cheap and read-only** when possible; it runs on every attempt before the ledger short-circuit.
+- Ensure **`reconcile` and `perform` agree** on the output shape so downstream nodes always see the same structure.
+- For strict “create once” semantics, still include all discriminating fields in **`request`** so the effect hash matches [effects](./effects) expectations if **`perform`** runs.
+
+<Callout type="info" title="When to skip reconcile">
+
+If the provider offers a native idempotency key and no listing API, [effects](./effects) alone is often enough.
+
+</Callout>
+
+## See also
+
+- [effects](./effects)
+- [determinism](./determinism) — hashing semantics for `request`

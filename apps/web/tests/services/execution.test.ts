@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  WorkflowEffect,
   WorkflowDefinition,
   WorkflowGraph,
   WorkflowNode,
@@ -48,11 +49,14 @@ function createWorkflow(
 function createRepositoryMock(
   overrides: Partial<Repository> = {},
 ): Repository & {
+  effects: Map<string, WorkflowEffect>;
   runs: Map<string, WorkflowRun>;
 } {
   const runs = new Map<string, WorkflowRun>();
+  const effects = new Map<string, WorkflowEffect>();
 
   return {
+    effects,
     runs,
     getBootstrap: vi.fn(),
     listWorkflows: vi.fn(),
@@ -83,6 +87,59 @@ function createRepositoryMock(
       runs.set(runId, next);
       return next;
     }),
+    upsertRunStep: vi.fn(async (_userId: string, runId: string, step) => {
+      const current = runs.get(runId);
+      if (current) {
+        const nextSteps = current.steps.filter((entry) => entry.nodeId !== step.nodeId);
+        current.steps = [...nextSteps, step];
+        runs.set(runId, current);
+      }
+      return step;
+    }),
+    claimEffect: vi.fn(async (input) => {
+      const existing = effects.get(input.effectKey);
+      if (existing) return existing;
+      const claimed: WorkflowEffect = {
+        id: `effect:${input.effectKey}`,
+        userId: input.userId,
+        runId: input.runId,
+        nodeId: input.nodeId,
+        effectKey: input.effectKey,
+        provider: input.provider,
+        operation: input.operation,
+        status: "pending",
+        requestHash: input.requestHash,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      effects.set(input.effectKey, claimed);
+      return claimed;
+    }),
+    completeEffect: vi.fn(async (input) => {
+      const current = effects.get(input.effectKey);
+      if (!current) throw new Error("Effect not found.");
+      const next: WorkflowEffect = {
+        ...current,
+        status: "complete",
+        output: input.output,
+        remoteRef: input.remoteRef,
+        updatedAt: new Date().toISOString(),
+      };
+      effects.set(input.effectKey, next);
+      return next;
+    }),
+    failEffect: vi.fn(async (input) => {
+      const current = effects.get(input.effectKey);
+      if (!current) throw new Error("Effect not found.");
+      const next: WorkflowEffect = {
+        ...current,
+        status: "failed",
+        error: input.error,
+        updatedAt: new Date().toISOString(),
+      };
+      effects.set(input.effectKey, next);
+      return next;
+    }),
     listConnections: vi.fn(),
     getConnectionByAlias: vi.fn(),
     getConnection: vi.fn(),
@@ -99,7 +156,10 @@ function createRepositoryMock(
     deleteSnippet: vi.fn(),
     close: vi.fn(async () => {}),
     ...overrides,
-  } as Repository & { runs: Map<string, WorkflowRun> };
+  } as Repository & {
+    effects: Map<string, WorkflowEffect>;
+    runs: Map<string, WorkflowRun>;
+  };
 }
 
 function createStepHarness() {
@@ -182,6 +242,7 @@ describe("workflow graph execution", () => {
     ]);
     expect(result.output).toEqual({ value: "true branch" });
     expect(step.do).toHaveBeenCalledTimes(3);
+    expect(repository.upsertRunStep).toHaveBeenCalledTimes(3);
   });
 
   it("halts execution when an End run block is reached", async () => {
@@ -429,15 +490,17 @@ describe("workflow graph execution", () => {
     expect(childRunUpdate?.[2]).toEqual(
       expect.objectContaining({
         status: "complete",
-        steps: expect.arrayContaining([
-          expect.objectContaining({
-            nodeId: "child-transform",
-            output: {
-              childMessage: "hello world",
-              parentEcho: "hello world",
-            },
-          }),
-        ]),
+      }),
+    );
+    expect(repository.upsertRunStep).toHaveBeenCalledWith(
+      "user-1",
+      expect.any(String),
+      expect.objectContaining({
+        nodeId: "child-transform",
+        output: {
+          childMessage: "hello world",
+          parentEcho: "hello world",
+        },
       }),
     );
   });

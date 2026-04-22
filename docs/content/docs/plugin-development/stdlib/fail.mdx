@@ -1,0 +1,45 @@
+---
+title: fail
+description: |
+  Terminal, non-retryable workflow failures via `NonRetryableError` in
+  `plugins/lib/std/fail`.
+---
+
+`plugins/lib/std/fail.ts` wraps Cloudflare’s **`NonRetryableError`** (`cloudflare:workflows`) so steps can stop the workflow immediately without burning retry budget on unrecoverable conditions.
+
+## API
+
+| Function | Behavior |
+| --- | --- |
+| `failWorkflow(message)` | Throws `NonRetryableError`; `never` return type. |
+| `failWorkflowIf(condition, message)` | Asserts `condition`; throws if falsy. |
+| `asNonRetryableError(error, fallback)` | Wraps unknown/`Error` in `NonRetryableError`. |
+
+## Example
+
+```ts
+import { failWorkflow, failWorkflowIf } from "../../lib/std/fail";
+
+failWorkflowIf(plan === "free", "This step requires a paid plan.");
+
+if (!response.headers.get("x-required-feature")) {
+  failWorkflow("Provider feature flag is off for this tenant.");
+}
+```
+
+## Best practices
+
+- Reserve **`failWorkflow`** for **user-fixable or policy** failures: bad configuration, missing entitlement, invalid graph assumptions—not transient HTTP blips.
+- For flaky networks, **throw normal `Error`** (or let [http](./http) fail) so Cloudflare can retry the step when configured.
+- When catching provider errors, use **`asNonRetryableError`** only when you are sure the error should not retry.
+
+<Callout type="warn" title="Ordinary throws are retryable">
+
+A plain `throw new Error(...)` inside a retried step can run again. **`NonRetryableError`** is the escape hatch when retries cannot help.
+
+</Callout>
+
+## See also
+
+- [retry](./retry) — step-level retry configuration.
+- [errors](./errors) — formatting provider errors before throwing.

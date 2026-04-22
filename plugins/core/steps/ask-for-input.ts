@@ -1,4 +1,5 @@
 import type { WorkflowStepRunner } from "../../runtime";
+import { ok } from "../../lib/std/result";
 
 export const run: WorkflowStepRunner = async ({ node, payload }) => {
   const answers =
@@ -24,15 +25,15 @@ export const run: WorkflowStepRunner = async ({ node, payload }) => {
     throw new Error(`"${label}" is required before this workflow can run.`);
   }
 
-  return {
-    detail: value.trim()
+  return ok(
+    value.trim()
       ? `Collected input for "${label}".`
       : `No input provided for "${label}".`,
-    output: {
+    {
       value,
       label,
       placeholder,
       required,
     },
-  };
+  );
 };

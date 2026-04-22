@@ -1,0 +1,51 @@
+---
+title: limits
+description: |
+  Shared byte, trace, timeout, and pagination limits in `plugins/lib/std/limits`.
+---
+
+`plugins/lib/std/limits.ts` centralizes numeric caps used by [result](./result), [observe](./observe), and [pagination](./pagination).
+
+## Constants
+
+| Constant | Value | Role |
+| --- | --- | --- |
+| `MAX_STEP_OUTPUT_BYTES` | 900_000 | Step output storage cap (matches `capOutputSize` default). |
+| `MAX_TRACE_EVENT_BYTES` | 32_000 | Serialized trace event payload cap. |
+| `DEFAULT_PAGE_SIZE` | 50 | Default list page size. |
+| `MAX_PAGE_SIZE` | 250 | Upper clamp for page sizes. |
+
+## Functions
+
+| Function | Behavior |
+| --- | --- |
+| `assertWorkflowOutputLimit(value)` | Asserts string byte length ≤ **`MAX_STEP_OUTPUT_BYTES`**. |
+| `assertTraceEventLimit(value)` | Asserts string byte length ≤ **`MAX_TRACE_EVENT_BYTES`**. |
+| `assertWorkflowTimeoutSeconds(seconds)` | Asserts ≤ **`MAX_SLEEP_SECONDS`** from [time](./time). |
+| `normalizePageSize(value, fallback?, max?)` | Parses positive number; floors; clamps to **`max`** (default **`MAX_PAGE_SIZE`**). |
+
+## Example
+
+```ts
+import { normalizePageSize, MAX_PAGE_SIZE } from "../../lib/std/limits";
+
+const pageSize = normalizePageSize(context.node.data.config.limit, 50, MAX_PAGE_SIZE);
+```
+
+## Best practices
+
+- When emitting large diagnostics, **`assertTraceEventLimit`** explains failures—trim previews before **`recordEvent`**.
+- Use **`normalizePageSize`** for any user-provided “limit” field on provider list APIs.
+- Do not raise **`MAX_STEP_OUTPUT_BYTES`** casually; it protects run history and database size.
+
+<Callout type="warn" title="Pagination helper">
+
+[pagination](./pagination) **`collectPaginated`** uses **`normalizePageSize`** on **`maxPages`** with an effective ceiling of 100—see that page for details.
+
+</Callout>
+
+## See also
+
+- [result](./result)
+- [observe](./observe)
+- [time](./time)

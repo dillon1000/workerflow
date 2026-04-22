@@ -1,0 +1,67 @@
+---
+title: retry
+description: |
+  Build Cloudflare `WorkflowStepConfig` retry presets and read attempt metadata
+  in `plugins/lib/std/retry`.
+---
+
+`plugins/lib/std/retry.ts` helps you describe **how** Cloudflare Workflows retries a step (`retries.limit`, `delay`, `backoff`, `timeout`) and read **`context.stepContext.attempt`** when you need branchy logic.
+
+## Constants
+
+- **`DEFAULT_STEP_TIMEOUT`** — `"30 minutes"`.
+- **`DEFAULT_STEP_RETRY_DELAY`** — `"10 seconds"`.
+
+## Config builders
+
+| Function | Typical use |
+| --- | --- |
+| `createRetryConfig(options?)` | Default exponential retries (limit 5). |
+| `noRetryConfig(options?)` | `limit: 0`, constant backoff—fail fast. |
+| `linearRetryConfig` / `exponentialRetryConfig` / `constantRetryConfig` | Named backoff presets. |
+
+## Context helpers
+
+| Function | Returns |
+| --- | --- |
+| `currentAttempt(context)` | `context.stepContext?.attempt ?? 1` |
+| `currentStepConfig(context)` | `context.stepConfig` |
+
+## Example (orchestrator-side)
+
+Retry config is usually attached where the workflow registers the step (outside a single plugin file). The shapes here match **`WorkflowStepConfig`** from `cloudflare:workers`:
+
+```ts
+import { createRetryConfig, noRetryConfig } from "../../lib/std/retry";
+
+const standard = createRetryConfig({ limit: 5, backoff: "exponential" });
+const noRetry = noRetryConfig({ timeout: "2 minutes" });
+```
+
+## Example (inside a step)
+
+```ts
+import { currentAttempt } from "../../lib/std/retry";
+
+const attempt = currentAttempt(context);
+if (attempt > 1) {
+  // e.g. widen search, alternate region—keep logic deterministic per attempt
+}
+```
+
+## Best practices
+
+- Prefer **idempotent** side effects ([effects](./effects)) instead of custom “retry loops” inside `perform`.
+- Use **`noRetryConfig`** for steps that call **`failWorkflow`**-style terminal errors after validation.
+- Read **`currentAttempt`** only for **observability or compensating behavior**, not for hiding non-idempotent bugs.
+
+<Callout type="info" title="Docs">
+
+See [Plugin Steps](../steps) for how `executionMode` interacts with `step.do` and retries.
+
+</Callout>
+
+## See also
+
+- [fail](./fail) — non-retryable errors.
+- [observe](./observe) — `logStepMetadataForObservability` includes attempt.

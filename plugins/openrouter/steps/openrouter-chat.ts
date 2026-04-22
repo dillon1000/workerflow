@@ -1,4 +1,9 @@
 import type { WorkflowStepRunner } from "../../runtime";
+import { requireConnection, requireSecret } from "../../lib/std/connections";
+import { numberConfig, renderedStringConfig } from "../../lib/std/config";
+import { executeIdempotentEffect } from "../../lib/std/effects";
+import { buildHttpRequest, fetchJson } from "../../lib/std/http";
+import { ok } from "../../lib/std/result";
 
 interface ChatCompletionResponse {
   choices?: { message?: { content?: string } }[];
@@ -6,24 +11,19 @@ interface ChatCompletionResponse {
   usage?: unknown;
 }
 
-export const run: WorkflowStepRunner = async ({
-  getConnection,
-  getConnectionSecret,
-  node,
-  render,
-}) => {
-  const connection = await getConnection(
-    String(node.data.config.connectionAlias ?? ""),
+export const run: WorkflowStepRunner = async (context) => {
+  const connection = await requireConnection(context);
+  const apiKey = await requireSecret(
+    context,
+    connection,
+    "apiKey",
+    "OpenRouter connection is missing an apiKey secret.",
   );
-  const apiKey = await getConnectionSecret(connection, "apiKey");
-  if (!apiKey) {
-    throw new Error("OpenRouter connection is missing an apiKey secret.");
-  }
 
-  const model = String(node.data.config.model ?? "openai/gpt-4o-mini");
-  const system = render(String(node.data.config.system ?? "")).trim();
-  const prompt = render(String(node.data.config.prompt ?? ""));
-  const temperature = Number(node.data.config.temperature ?? 0.2);
+  const model = String(context.node.data.config.model ?? "openai/gpt-4o-mini");
+  const system = renderedStringConfig(context, "system").trim();
+  const prompt = renderedStringConfig(context, "prompt");
+  const temperature = numberConfig(context, "temperature", 0.2);
 
   const messages: { role: string; content: string }[] = [];
   if (system) messages.push({ role: "system", content: system });
@@ -38,29 +38,46 @@ export const run: WorkflowStepRunner = async ({
   const title = String(connection.config.title ?? "").trim();
   if (title) headers["X-Title"] = title;
 
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: Number.isFinite(temperature) ? temperature : undefined,
-      }),
+  const output = await executeIdempotentEffect<{
+    content: string;
+    usage: unknown;
+    raw: ChatCompletionResponse;
+  }>(context, {
+    provider: "openrouter",
+    operation: "chat-completions",
+    request: { model, messages, temperature },
+    perform: async (effectKey) => {
+      const request = buildHttpRequest(context, {
+        method: "POST",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        headers: {
+          ...headers,
+          "X-Workflow-Effect-Key": effectKey,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: Number.isFinite(temperature) ? temperature : undefined,
+        }),
+        provider: "openrouter",
+        operation: "chat-completions",
+      });
+      const { response, body } = await fetchJson<ChatCompletionResponse>(
+        context,
+        request,
+      );
+      if (!response.ok) {
+        throw new Error(
+          body.error?.message ?? `OpenRouter returned ${response.status}.`,
+        );
+      }
+
+      return {
+        content: body.choices?.[0]?.message?.content ?? "",
+        usage: body.usage ?? null,
+        raw: body,
+      };
     },
-  );
-
-  const body = (await response.json()) as ChatCompletionResponse;
-  if (!response.ok) {
-    throw new Error(
-      body.error?.message ?? `OpenRouter returned ${response.status}.`,
-    );
-  }
-
-  const content = body.choices?.[0]?.message?.content ?? "";
-  return {
-    detail: "OpenRouter chat completion succeeded.",
-    output: { content, usage: body.usage, raw: body },
-  };
+  });
+  return ok("OpenRouter chat completion succeeded.", output);
 };

@@ -1,0 +1,48 @@
+---
+title: connections
+description: |
+  `requireConnection` and `requireSecret` for consistent connection and
+  credential loading in `plugins/lib/std/connections`.
+---
+
+`plugins/lib/std/connections.ts` wraps `context.getConnection` and `context.getConnectionSecret` with shared error messages and trimming.
+
+## API
+
+| Function | Returns | Behavior |
+| --- | --- | --- |
+| `requireConnection(context, aliasKey?)` | `Promise<ConnectionDefinition>` | Reads `config[aliasKey]` (default `connectionAlias`), asserts non-empty, `getConnection`. |
+| `requireSecret(context, connection, keyName, message)` | `Promise<string>` | Loads secret; throws `Error(message)` if missing or empty. |
+
+## Example
+
+```ts
+import { requireConnection, requireSecret } from "../../lib/std/connections";
+
+const connection = await requireConnection(context);
+const apiKey = await requireSecret(
+  context,
+  connection,
+  "apiKey",
+  "This connection is missing an API key secret.",
+);
+
+const other = await requireConnection(context, "secondaryConnectionAlias");
+```
+
+## Best practices
+
+- Keep **`message` actionable**: tell the user which secret name is missing so they can fix the connection in the app.
+- If a node uses a non-default alias field, pass the **`aliasKey`** that matches your manifest `fields[].key`.
+- Never log secret values; use [observe](./observe) and [redaction](./redaction)-aware helpers for traces.
+
+<Callout type="warn" title="Order of operations">
+
+Resolve the connection **before** building HTTP requests so you fail fast on missing aliases instead of sending unauthenticated calls.
+
+</Callout>
+
+## See also
+
+- [auth](./auth) for header composition after you have a token.
+- [http](./http) for traced `fetch` helpers.

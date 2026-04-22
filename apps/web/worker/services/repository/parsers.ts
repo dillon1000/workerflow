@@ -4,16 +4,19 @@ import type {
   ConnectionDefinition,
   ConnectionProvider,
   TriggerKind,
+  WorkflowEffect,
   WorkflowDefinition,
   WorkflowGraph,
   WorkflowMode,
   WorkflowRun,
   WorkflowRunStep,
+  WorkflowTraceEvent,
   WorkflowVersion,
 } from "../../../src/lib/workflow/types";
 import {
   connectionSecretMetadataTable,
   connectionsTable,
+  workflowEffectsTable,
   workflowRunStepsTable,
   workflowRunsTable,
   workflowsTable,
@@ -24,6 +27,7 @@ type WorkflowRow = InferSelectModel<typeof workflowsTable>;
 type VersionRow = InferSelectModel<typeof workflowVersionsTable>;
 type RunRow = InferSelectModel<typeof workflowRunsTable>;
 type StepRow = InferSelectModel<typeof workflowRunStepsTable>;
+type EffectRow = InferSelectModel<typeof workflowEffectsTable>;
 type ConnectionRow = InferSelectModel<typeof connectionsTable>;
 type SecretMetadataRow = InferSelectModel<typeof connectionSecretMetadataTable>;
 
@@ -134,7 +138,29 @@ export function parseRun(row: RunRow, steps: StepRow[]): WorkflowRun {
         finishedAt: step.finishedAt ?? undefined,
         durationMs: step.durationMs ?? undefined,
         output: step.outputJson ? JSON.parse(step.outputJson) : undefined,
+        traceEvents: step.traceJson
+          ? (JSON.parse(step.traceJson) as WorkflowTraceEvent[])
+          : undefined,
       })),
+  };
+}
+
+export function parseEffect(row: EffectRow): WorkflowEffect {
+  return {
+    id: row.id,
+    userId: row.userId,
+    runId: row.runId,
+    nodeId: row.nodeId,
+    effectKey: row.effectKey,
+    provider: row.provider,
+    operation: row.operation,
+    status: row.status as WorkflowEffect["status"],
+    requestHash: row.requestHash,
+    output: row.outputJson ? JSON.parse(row.outputJson) : undefined,
+    remoteRef: row.remoteRef ?? undefined,
+    error: row.error ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 

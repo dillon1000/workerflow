@@ -1,0 +1,49 @@
+---
+title: schema
+description: |
+  Lightweight field decoders and `decodeObject` for structured plugin config
+  in `plugins/lib/std/schema`.
+---
+
+`plugins/lib/std/schema.ts` builds small, reusable decoders for `unknown` values—useful when you treat config as a record and want explicit validation beyond raw [config](./config) helpers.
+
+## API
+
+| Export | Behavior |
+| --- | --- |
+| `stringField(field, options?)` | `Decoder<string>`: optional `minLength`, `trim` (default trim). |
+| `numberField(field, options?)` | `Decoder<number>`: must be finite; optional `min` / `max`. |
+| `booleanField()` | `Decoder<boolean>`: `true` or string `"true"`. |
+| `optional(decoder)` | `Decoder<T \| undefined>`: empty string or nullish → `undefined`. |
+| `decodeObject(input, schema)` | Applies each decoder to `input[key]`; returns typed object. |
+
+## Example
+
+```ts
+import { decodeObject, numberField, stringField, optional } from "../../lib/std/schema";
+
+const raw = context.node.data.config as Record<string, unknown>;
+
+const { title, priority, label } = decodeObject(raw, {
+  title: stringField("title", { minLength: 1 }),
+  priority: numberField("priority", { min: 0, max: 5 }),
+  label: optional(stringField("label")),
+});
+```
+
+## Best practices
+
+- Use **`decodeObject` at the top of `run`** when you have several related fields; failures throw with the field name in the message.
+- Combine with **`renderedStringConfig`** when a field must be templated **before** decoding: render first, then pass the string into a decoder or parse JSON separately.
+- For Inspector JSON blobs, parse with `jsonConfig` / `objectJsonConfig` first, then run **`decodeObject`** on the result if you need per-key rules.
+
+<Callout type="info" title="When to use config.ts instead">
+
+If you only need one or two simple keys, [config](./config) helpers are less verbose. Use **schema** when validation rules and typed bundles pay for themselves.
+
+</Callout>
+
+## See also
+
+- [guards](./guards) — underlying `assert` for decoder failures.
+- [config](./config) — key-by-key access with defaults.
