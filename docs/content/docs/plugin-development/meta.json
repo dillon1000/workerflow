@@ -1,4 +1,4 @@
 {
   "title": "Plugin Development",
-  "pages": ["index", "steps", "schema", "inspector", "nodes"]
+  "pages": ["index", "steps", "std", "stdlib", "schema", "inspector", "nodes"]
 }

@@ -57,6 +57,7 @@ Do not leave the project with type errors or linting issues.
 
 - Plugin step files must use `fetch` directly for API integrations.
 - Do not add SDK package dependencies for providers like GitHub, Linear, or others.
+- Prefer shared helpers from `plugins/lib/std/` for config parsing, connection loading, HTTP setup, idempotent effects, terminal failures, retry configuration, and observability.
 - Do not add a `dependencies` field to plugin definitions.
 - The reason is supply-chain safety and keeping plugin execution transparent.
 - Plugins are folder-based under `plugins/<plugin-id>/` and auto-discovered at build time.
@@ -90,4 +91,5 @@ Do not leave the project with type errors or linting issues.
 - The app and worker discover plugin manifests, icons, step handlers, trigger handlers, and connection test handlers from the plugin folder structure.
 - Use `executionMode: "step"` by default for executable nodes.
 - Use `executionMode: "inline"` only for steps that must call workflow primitives directly, such as `step.sleep(...)`.
+- Do not implement local retry loops inside plugin steps. Cloudflare Workflows owns retries; plugin code should focus on granular steps, idempotent effects, terminal failures via `NonRetryableError`, and optional retry configuration.
 - Keep plugin runtime code inside the plugin folder unless you are intentionally changing shared workflow infrastructure.

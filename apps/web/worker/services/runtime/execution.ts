@@ -1,4 +1,4 @@
-import type { WorkflowStep } from "cloudflare:workers";
+import type { WorkflowStep, WorkflowStepContext } from "cloudflare:workers";
 import type {
   WorkflowRuntimeStep,
   WorkflowStepExecutionContext,
@@ -12,6 +12,7 @@ import type {
   WorkflowNode,
   WorkflowRun,
   WorkflowRunStep,
+  WorkflowTraceEvent,
 } from "../../../src/lib/workflow/types";
 import type { WorkerEnv } from "../../lib/env";
 import {
@@ -60,12 +61,12 @@ async function getConnectionSecret(
 
 function createStep(step: Omit<WorkflowRunStep, "id">): WorkflowRunStep {
   return {
-    id: createId("step"),
+    id: `${step.runId}:${step.nodeId}`,
     ...step,
   };
 }
 
-async function executeNode(
+function createExecutionContext(
   node: WorkflowNode,
   nodes: WorkflowNode[],
   payload: Record<string, unknown>,
@@ -75,33 +76,14 @@ async function executeNode(
   userId: string,
   runId: string,
   step: WorkflowStep,
-): Promise<WorkflowRunStep> {
+  stepName?: string,
+  cloudflareStepContext?: WorkflowStepContext,
+): WorkflowStepExecutionContext {
   const render = (value: string) =>
     renderTemplate(value, payload, outputs, nodes);
-  const start = new Date().toISOString();
-  const finish = () => new Date().toISOString();
+  const traceEvents: WorkflowTraceEvent[] = [];
 
-  if (node.data.family === "trigger") {
-    return createStep({
-      runId,
-      nodeId: node.id,
-      nodeTitle: node.data.title,
-      kind: node.data.kind,
-      status: "complete",
-      detail: `${node.data.title} accepted the incoming trigger payload.`,
-      startedAt: start,
-      finishedAt: finish(),
-      durationMs: 0,
-      output: toJsonValue(payload),
-    });
-  }
-
-  const runner = getWorkflowStepRunner(node.data.kind);
-  if (!runner) {
-    throw new Error(`No plugin runner registered for "${node.data.kind}".`);
-  }
-
-  const context: WorkflowStepExecutionContext = {
+  return {
     env,
     repository,
     userId,
@@ -111,6 +93,8 @@ async function executeNode(
     outputs,
     nodes,
     step: step as unknown as WorkflowRuntimeStep,
+    stepName,
+    stepContext: cloudflareStepContext,
     render,
     parseList,
     parseMaybeJson,
@@ -135,9 +119,98 @@ async function executeNode(
         outputs,
         nodes,
       ),
+    recordTraceEvent: (event) => {
+      const next: WorkflowTraceEvent = {
+        ...event,
+        createdAt: event.createdAt ?? new Date().toISOString(),
+      };
+      traceEvents.push(next);
+      return next;
+    },
+    getTraceEvents: () => [...traceEvents],
   };
+}
+
+async function executeNode(
+  context: WorkflowStepExecutionContext,
+): Promise<WorkflowRunStep> {
+  const { node, payload, runId } = context;
+  const start = new Date().toISOString();
+  const finish = () => new Date().toISOString();
+
+  if (node.data.family === "trigger") {
+    context.recordTraceEvent({
+      type: "trigger.accepted",
+      detail: `${node.data.title} accepted the incoming trigger payload.`,
+    });
+    return createStep({
+      runId,
+      nodeId: node.id,
+      nodeTitle: node.data.title,
+      kind: node.data.kind,
+      status: "complete",
+      detail: `${node.data.title} accepted the incoming trigger payload.`,
+      startedAt: start,
+      finishedAt: finish(),
+      durationMs: 0,
+      output: toJsonValue(payload),
+      traceEvents: context.getTraceEvents(),
+    });
+  }
+
+  const runner = getWorkflowStepRunner(node.data.kind);
+  if (!runner) {
+    throw new Error(`No plugin runner registered for "${node.data.kind}".`);
+  }
+
+  context.recordTraceEvent({
+    type: "step.started",
+    detail: `${node.data.title} started.`,
+  });
+  if (context.stepContext) {
+    context.recordTraceEvent({
+      type: "step.metadata",
+      detail: context.stepName ?? context.node.id,
+      data: {
+        attempt: context.stepContext.attempt,
+        stepName: context.stepName ?? context.node.id,
+        config: context.stepConfig ?? null,
+      },
+    });
+    context.recordTraceEvent({
+      type: "cloudflare.metric-hint",
+      detail:
+        context.stepContext.attempt > 1 ? "ATTEMPT_START" : "STEP_START",
+      data: {
+        eventType:
+          context.stepContext.attempt > 1 ? "ATTEMPT_START" : "STEP_START",
+        stepName: context.stepName ?? context.node.id,
+        attempt: context.stepContext.attempt,
+      },
+    });
+  }
 
   const result = await runner(context);
+  context.recordTraceEvent({
+    type: "step.completed",
+    detail: result.detail,
+    data: {
+      status: result.status ?? "complete",
+    },
+  });
+  if (context.stepContext) {
+    context.recordTraceEvent({
+      type: "cloudflare.metric-hint",
+      detail:
+        context.stepContext.attempt > 1 ? "ATTEMPT_SUCCESS" : "STEP_SUCCESS",
+      data: {
+        eventType:
+          context.stepContext.attempt > 1 ? "ATTEMPT_SUCCESS" : "STEP_SUCCESS",
+        stepName: context.stepName ?? context.node.id,
+        attempt: context.stepContext.attempt,
+      },
+    });
+  }
   return createStep({
     runId,
     nodeId: node.id,
@@ -149,7 +222,123 @@ async function executeNode(
     finishedAt: finish(),
     durationMs: result.durationMs ?? 0,
     output: toJsonValue(result.output),
+    traceEvents: context.getTraceEvents(),
   });
+}
+
+function buildErroredStep(
+  context: WorkflowStepExecutionContext,
+  startedAt: string,
+  error: unknown,
+): WorkflowRunStep {
+  const message =
+    error instanceof Error ? error.message : "Unknown runtime failure.";
+  context.recordTraceEvent({
+    type: "step.failed",
+    detail: message,
+  });
+  if (context.stepContext) {
+    context.recordTraceEvent({
+      type: "cloudflare.metric-hint",
+      detail:
+        context.stepContext.attempt > 1 ? "ATTEMPT_FAILURE" : "STEP_FAILURE",
+      data: {
+        eventType:
+          context.stepContext.attempt > 1 ? "ATTEMPT_FAILURE" : "STEP_FAILURE",
+        stepName: context.stepName ?? context.node.id,
+        attempt: context.stepContext.attempt,
+      },
+    });
+  }
+  return createStep({
+    runId: context.runId,
+    nodeId: context.node.id,
+    nodeTitle: context.node.data.title,
+    kind: context.node.data.kind,
+    status: "errored",
+    detail: message,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    durationMs: 0,
+    traceEvents: context.getTraceEvents(),
+  });
+}
+
+async function persistRunStep(
+  repository: Repository,
+  userId: string,
+  runId: string,
+  stepRecord: WorkflowRunStep,
+) {
+  await repository.upsertRunStep(userId, runId, stepRecord);
+}
+
+async function runNodeWithPersistence(
+  context: WorkflowStepExecutionContext,
+  workflowStep: WorkflowStep,
+) {
+  const startedAt = new Date().toISOString();
+  if (getWorkflowNodeExecutionMode(context.node.data.kind) === "inline") {
+    try {
+      const stepRecord = await executeNode(context);
+      await workflowStep.do(`persist:${context.node.id}`, async () => {
+        await persistRunStep(
+          context.repository as Repository,
+          context.userId,
+          context.runId,
+          stepRecord,
+        );
+        return null;
+      });
+      return stepRecord;
+    } catch (error) {
+      const failedStep = buildErroredStep(context, startedAt, error);
+      await workflowStep.do(`persist:${context.node.id}:error`, async () => {
+        await persistRunStep(
+          context.repository as Repository,
+          context.userId,
+          context.runId,
+          failedStep,
+        );
+        return null;
+      });
+      throw error;
+    }
+  }
+
+  let executedStep: WorkflowRunStep | null = null;
+  await workflowStep.do(
+    `${context.node.id}:${context.node.data.kind}`,
+    async (cloudflareStepContext) => {
+      const scopedContext: WorkflowStepExecutionContext = {
+        ...context,
+        stepContext: cloudflareStepContext,
+      };
+      try {
+        executedStep = await executeNode(scopedContext);
+        await persistRunStep(
+          scopedContext.repository as Repository,
+          scopedContext.userId,
+          scopedContext.runId,
+          executedStep,
+        );
+        return null;
+      } catch (error) {
+        const failedStep = buildErroredStep(scopedContext, startedAt, error);
+        await persistRunStep(
+          scopedContext.repository as Repository,
+          scopedContext.userId,
+          scopedContext.runId,
+          failedStep,
+        );
+        throw error;
+      }
+    },
+  );
+  if (!executedStep) {
+    throw new Error(`Step "${context.node.id}" did not produce an output.`);
+  }
+  return executedStep;
 }
 
 function nextNodes(
@@ -250,7 +439,6 @@ async function runSubworkflow(
     status: result.status,
     finishedAt: new Date().toISOString(),
     durationMs: Date.now() - started,
-    steps: result.steps,
   });
 
   if (result.status === "errored") {
@@ -334,14 +522,6 @@ export async function executeWorkflowGraph(
   const steps: WorkflowRunStep[] = [];
   let finalOutput: unknown = null;
 
-  const persistProgress = async (status: "running" | "errored") => {
-    try {
-      await repository.updateRun(userId, runId, { status, steps });
-    } catch {
-      // Best-effort progress reporting; real terminal update happens at the end.
-    }
-  };
-
   while (queue.length > 0) {
     const nodeId = queue.shift();
     if (!nodeId || visited.has(nodeId)) continue;
@@ -349,71 +529,48 @@ export async function executeWorkflowGraph(
     if (!node) continue;
     visited.add(nodeId);
 
-    const pendingStep: WorkflowRunStep = {
-      id: createId("step"),
-      runId,
-      nodeId: node.id,
-      nodeTitle: node.data.title,
-      kind: node.data.kind,
-      status: "running",
-      detail: "Executing…",
-      startedAt: new Date().toISOString(),
-    };
-    steps.push(pendingStep);
-    await persistProgress("running");
-
     try {
-      const nodeStep =
-        getWorkflowNodeExecutionMode(node.data.kind) === "inline"
-          ? await executeNode(
-              node,
-              graph.nodes,
-              payload,
-              outputs,
-              env,
-              repository,
-              userId,
-              runId,
-              step,
-            )
-          : ((await step.do(
-              `${node.id}:${node.data.kind}`,
-              async () =>
-                executeNode(
-                  node,
-                  graph.nodes,
-                  payload,
-                  outputs,
-                  env,
-                  repository,
-                  userId,
-                  runId,
-                  step,
-                ) as never,
-            )) as WorkflowRunStep);
-
-      steps[steps.length - 1] = nodeStep;
+      const context = createExecutionContext(
+        node,
+        graph.nodes,
+        payload,
+        outputs,
+        env,
+        repository,
+        userId,
+        runId,
+        step,
+        `${node.id}:${node.data.kind}`,
+      );
+      const nodeStep = await runNodeWithPersistence(context, step);
+      steps.push(nodeStep);
       outputs[node.id] = nodeStep.output;
       finalOutput = nodeStep.output ?? finalOutput;
-      await persistProgress("running");
       for (const next of nextNodes(graph, node, nodeStep.output)) {
         queue.push(next);
       }
     } catch (error) {
-      steps[steps.length - 1] = {
-        id: pendingStep.id,
-        runId,
-        nodeId: node.id,
-        nodeTitle: node.data.title,
-        kind: node.data.kind,
-        status: "errored",
-        detail:
-          error instanceof Error ? error.message : "Unknown runtime failure.",
-        startedAt: pendingStep.startedAt,
-        finishedAt: new Date().toISOString(),
-        durationMs: 0,
-      };
-      await persistProgress("errored");
+      const failedStep = await repository
+        .getRun(userId, runId)
+        .then(
+          (run) =>
+            run?.steps.find((entry) => entry.nodeId === node.id) ??
+            createStep({
+              runId,
+              nodeId: node.id,
+              nodeTitle: node.data.title,
+              kind: node.data.kind,
+              status: "errored",
+              detail:
+                error instanceof Error
+                  ? error.message
+                  : "Unknown runtime failure.",
+              startedAt: new Date().toISOString(),
+              finishedAt: new Date().toISOString(),
+              durationMs: 0,
+            }),
+        );
+      steps.push(failedStep);
       return {
         status: "errored",
         steps,

@@ -1,0 +1,52 @@
+---
+title: config
+description: |
+  Read and coerce Inspector `node.data.config` values—strings, templates,
+  numbers, booleans, and JSON—with `plugins/lib/std/config`.
+---
+
+`plugins/lib/std/config.ts` reads `context.node.data.config` using the same keys you declare in the node manifest `fields`.
+
+## API
+
+| Function | Returns | Behavior |
+| --- | --- | --- |
+| `stringConfig(context, key, fallback?)` | `string` | `String(config[key] ?? fallback)`. |
+| `renderedStringConfig(context, key, fallback?)` | `string` | `stringConfig`, then `context.render(...)` for template syntax. |
+| `numberConfig(context, key, fallback?)` | `number` | `Number(config[key] ?? fallback)`. |
+| `booleanConfig(context, key, fallback?)` | `boolean` | `true` if value is boolean `true` or string `"true"`; else `fallback`. |
+| `jsonConfig(context, key, fallback)` | `unknown` | `renderedStringConfig` + `context.parseMaybeJson`. |
+| `objectJsonConfig(context, key, fallback?)` | `Record<string, unknown>` | `jsonConfig` then asserts a plain object (not array/null). |
+
+## Example
+
+```ts
+import {
+  renderedStringConfig,
+  numberConfig,
+  booleanConfig,
+  objectJsonConfig,
+} from "../../lib/std/config";
+
+const prompt = renderedStringConfig(context, "prompt", "");
+const maxTokens = numberConfig(context, "maxTokens", 1024);
+const stream = booleanConfig(context, "stream", false);
+const metadata = objectJsonConfig(context, "metadata", "{}");
+```
+
+## Best practices
+
+- Prefer **`renderedStringConfig`** for any field that should support `{{ ... }}` templates.
+- Use **`objectJsonConfig`** only when the Inspector stores a JSON **object**. For arrays or unknown shape, use **`jsonConfig`** and narrow yourself.
+- **`numberConfig`** does not validate finiteness; pair with [schema](./schema) `numberField` when you need min/max checks.
+
+<Callout type="warn" title="Coercion gotchas">
+
+`Number("")` is `0` and `Number(undefined)` is `NaN` before fallbacks—always pass a sensible `fallback` for numeric fields users may clear.
+
+</Callout>
+
+## See also
+
+- [schema](./schema) for validated decoding.
+- [guards](./guards) for `assertJsonObject` used inside `objectJsonConfig`.

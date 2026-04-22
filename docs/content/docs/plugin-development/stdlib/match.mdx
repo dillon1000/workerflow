@@ -1,0 +1,44 @@
+---
+title: match
+description: |
+  `matchOneOf` and `matchesPattern` for normalizing strings in
+  `plugins/lib/std/match`.
+---
+
+`plugins/lib/std/match.ts` offers tiny helpers for **enum-like** config and **regex** checks without pulling a validation library.
+
+## API
+
+| Function | Behavior |
+| --- | --- |
+| `matchOneOf(value, allowed, fallback)` | If `value` is in `allowed`, returns it; else **`fallback`**. |
+| `matchesPattern(value, pattern)` | `pattern.test(value)`. |
+
+## Example
+
+```ts
+import { matchOneOf, matchesPattern } from "../../lib/std/match";
+
+const sort = matchOneOf(rendered, ["asc", "desc"] as const, "asc");
+
+if (!matchesPattern(slug, /^[a-z0-9-]{1,64}$/)) {
+  throw new Error("Invalid slug format.");
+}
+```
+
+## Best practices
+
+- Pass **`allowed` as `as const`** so TypeScript narrows the return type to the union.
+- Combine with [schema](./schema) when you need error messages per field—**`matchOneOf`** silently falls back, which may hide typos if not paired with validation elsewhere.
+- Prefer explicit provider enums over magic strings when the manifest `select` options are the source of truth.
+
+<Callout type="warn" title="Fallback behavior">
+
+A silent **`fallback`** can mask misconfiguration. For required enums, validate first or use **`assert`** / **`stringField`**.
+
+</Callout>
+
+## See also
+
+- [config](./config) — raw string reads before matching.
+- [schema](./schema)

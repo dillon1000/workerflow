@@ -1,0 +1,40 @@
+---
+title: Plugin stdlib modules
+description: |
+  Per-module reference for `plugins/lib/std`—examples, APIs, and usage notes
+  for Workerflow plugin steps.
+---
+
+Source lives under `plugins/lib/std/`. From a step file at `plugins/<plugin-id>/steps/<step>.ts`, import with paths like `../../lib/std/config`.
+
+<Cards>
+  <Card title="config" href="./config" description="Inspector config: strings, numbers, booleans, JSON." />
+  <Card title="schema" href="./schema" description="Field decoders and `decodeObject` for structured config." />
+  <Card title="connections" href="./connections" description="`requireConnection` and `requireSecret`." />
+  <Card title="auth" href="./auth" description="Bearer, Basic, merged headers, idempotency keys." />
+  <Card title="http" href="./http" description="`buildHttpRequest`, `fetchJson`, `fetchText`, fingerprints." />
+  <Card title="effects" href="./effects" description="`executeIdempotentEffect` and the effect ledger." />
+  <Card title="reconcile" href="./reconcile" description="Lookup-before-create wrapped around effects." />
+  <Card title="fail" href="./fail" description="Non-retryable workflow failures." />
+  <Card title="retry" href="./retry" description="Cloudflare step retry config helpers." />
+  <Card title="result" href="./result" description="`ok(...)` and output size capping." />
+  <Card title="observe" href="./observe" description="Trace events, HTTP lines, Cloudflare hints." />
+  <Card title="errors" href="./errors" description="Normalize errors and HTTP failures." />
+  <Card title="guards" href="./guards" description="`assert`, non-empty string, JSON object, byte limits." />
+  <Card title="determinism" href="./determinism" description="Stable hashes and seeded PRNG." />
+  <Card title="match" href="./match" description="Enum matching and regex checks." />
+  <Card title="time" href="./time" description="ISO time, duration parsing, sleep bounds." />
+  <Card title="limits" href="./limits" description="Output, trace, timeout, and page-size constants." />
+  <Card title="redaction" href="./redaction" description="Strip secrets from traces and objects." />
+  <Card title="pagination" href="./pagination" description="Cursor pagination and `collectPaginated`." />
+  <Card title="webhooks" href="./webhooks" description="HMAC sign and verify webhook payloads." />
+</Cards>
+
+## Suggested reading order
+
+1. [config](./config) and [schema](./schema) for inputs.
+2. [connections](./connections) and [auth](./auth) for credentials.
+3. [http](./http) plus [effects](./effects) (or [reconcile](./reconcile)) for outbound APIs.
+4. [result](./result) and [observe](./observe) for what you return and record.
+
+Concepts: [Idempotent effects](/docs/concepts/idempotent-effects), [Observability](/docs/concepts/observability), [Plugin stdlib](/docs/concepts/plugin-stdlib).

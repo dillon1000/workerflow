@@ -1,16 +1,17 @@
 import type {
   BootstrapPayload,
   ConnectionDefinition,
+  WorkflowEffect,
   WorkflowDefinition,
   WorkflowGraph,
   WorkflowMode,
   WorkflowRun,
+  WorkflowRunStep,
   WorkflowSnippet,
   WorkflowVersion,
 } from "../../src/lib/workflow/types";
 import type { WorkerEnv } from "../lib/env";
 import { createDb } from "./database";
-import { PgRepository } from "./repository/pg-repository";
 
 export interface Repository {
   getBootstrap(userId: string): Promise<BootstrapPayload>;
@@ -55,6 +56,31 @@ export interface Repository {
     runId: string,
     patch: Partial<WorkflowRun>,
   ): Promise<WorkflowRun>;
+  upsertRunStep(
+    userId: string,
+    runId: string,
+    step: WorkflowRunStep,
+  ): Promise<WorkflowRunStep>;
+  claimEffect(input: {
+    userId: string;
+    runId: string;
+    nodeId: string;
+    effectKey: string;
+    provider: string;
+    operation: string;
+    requestHash: string;
+  }): Promise<WorkflowEffect>;
+  completeEffect(input: {
+    userId: string;
+    effectKey: string;
+    output?: WorkflowEffect["output"];
+    remoteRef?: string;
+  }): Promise<WorkflowEffect>;
+  failEffect(input: {
+    userId: string;
+    effectKey: string;
+    error: string;
+  }): Promise<WorkflowEffect>;
   listConnections(userId: string): Promise<ConnectionDefinition[]>;
   getConnectionByAlias(
     userId: string,
@@ -119,6 +145,7 @@ export interface Repository {
 }
 
 export async function createRepository(env: WorkerEnv): Promise<Repository> {
+  const { PgRepository } = await import("./repository/pg-repository");
   const { db, client } = await createDb(env);
   return new PgRepository(db, client);
 }

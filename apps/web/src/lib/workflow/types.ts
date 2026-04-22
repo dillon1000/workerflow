@@ -7,6 +7,7 @@ export type WorkflowNodeKind = string;
 export type WorkflowMode = "standard" | "subworkflow";
 export type WorkflowStatus = "draft" | "published";
 export type RunStatus = "queued" | "running" | "complete" | "errored";
+export type WorkflowEffectStatus = "pending" | "complete" | "failed";
 export type JsonValue =
   | string
   | number
@@ -92,6 +93,13 @@ export interface WorkflowVersion {
   definition: WorkflowGraph;
 }
 
+export interface WorkflowTraceEvent {
+  type: string;
+  createdAt: string;
+  detail?: string;
+  data?: JsonValue;
+}
+
 export interface WorkflowRunStep {
   id: string;
   runId: string;
@@ -104,6 +112,7 @@ export interface WorkflowRunStep {
   finishedAt?: string;
   durationMs?: number;
   output?: JsonValue;
+  traceEvents?: WorkflowTraceEvent[];
 }
 
 export interface WorkflowRun {
@@ -122,6 +131,23 @@ export interface WorkflowRun {
   rootRunId?: string;
   runDepth?: number;
   steps: WorkflowRunStep[];
+}
+
+export interface WorkflowEffect {
+  id: string;
+  userId: string;
+  runId: string;
+  nodeId: string;
+  effectKey: string;
+  provider: string;
+  operation: string;
+  status: WorkflowEffectStatus;
+  requestHash: string;
+  output?: unknown;
+  remoteRef?: string;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ConnectionDefinition {

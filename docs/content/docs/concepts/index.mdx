@@ -1,0 +1,39 @@
+---
+title: Concepts
+description: |
+  The architectural ideas behind Workerflow: durable execution, retry-safe
+  effects, tracing, and the plugin standard library.
+---
+
+Workerflow is easier to reason about once you separate the system into a few core ideas:
+
+- the graph is an authoring model
+- Cloudflare Workflows is the execution substrate
+- plugin steps are the integration boundary
+- external effects need retry-safe handling
+- traces and run history are not the same thing
+
+## Read these first
+
+<Cards>
+  <Card
+    title="Durable Execution"
+    description="How graph nodes map to workflow steps, checkpoints, and retries."
+    href="/docs/concepts/durable-execution"
+  />
+  <Card
+    title="Idempotent Effects"
+    description="Why outbound side effects need a ledger and effect keys."
+    href="/docs/concepts/idempotent-effects"
+  />
+  <Card
+    title="Observability"
+    description="Trace events, run steps, and what each one is for."
+    href="/docs/concepts/observability"
+  />
+  <Card
+    title="Plugin Standard Library"
+    description="Why `plugins/lib/std` exists and how plugin authors should use it."
+    href="/docs/concepts/plugin-stdlib"
+  />
+</Cards>

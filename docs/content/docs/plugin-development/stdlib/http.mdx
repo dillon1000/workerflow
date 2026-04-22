@@ -1,0 +1,65 @@
+---
+title: http
+description: |
+  Build requests, fingerprint calls, and fetch with automatic trace events
+  in `plugins/lib/std/http`.
+---
+
+`plugins/lib/std/http.ts` pairs with [observe](./observe) to emit **`http.request`** / **`http.response`** (and a **`http.request.built`** line) so runs have a consistent network audit trail.
+
+## API
+
+### `HttpRequestDefinition`
+
+`method`, `url`, optional `headers`, `body`, optional `provider` and `operation` (for tracing only).
+
+### `buildHttpRequest(context, input)`
+
+- Uppercases `method`, merges `headers` into `Headers`.
+- Drops body for `GET`.
+- Records `http.request.built` via `context.recordTraceEvent`.
+- Returns `{ method, url, headers, body, provider, operation }` suitable for `fetchJson` / `fetchText`.
+
+### `requestFingerprint(input)`
+
+Async hash (via [determinism](./determinism)) of method, URL, header entries, and body—useful for logging or custom dedupe outside [effects](./effects).
+
+### `fetchJson` / `fetchText`
+
+Calls `fetch`, records external call + result, returns `{ response, body }`. **`fetchJson`** parses JSON; **`fetchText`** reads text.
+
+## Example
+
+```ts
+import { buildHttpRequest, fetchJson } from "../../lib/std/http";
+import { throwForHttpError } from "../../lib/std/errors";
+
+const request = buildHttpRequest(context, {
+  method: "POST",
+  url: renderedUrl,
+  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+  body: JSON.stringify(payload),
+  provider: "acme",
+  operation: "tickets.create",
+});
+
+const { response, body } = await fetchJson<AcmeResponse>(context, request);
+await throwForHttpError(response, "Acme API error");
+```
+
+## Best practices
+
+- Always set **`provider`** and **`operation`** when integrating a third party—downstream observability and support benefit from stable names.
+- Prefer **`buildHttpRequest`** even if you only need headers normalization; the built event makes dry-run debugging easier.
+- Pair with [errors](./errors) **`throwForHttpError`** instead of hand-rolling status checks when you want a single throw path.
+
+<Callout type="warn" title="Response bodies">
+
+`fetchJson` always parses JSON. For error responses that might be HTML or plain text, catch failures or use **`fetchText`** and branch on `Content-Type`.
+
+</Callout>
+
+## See also
+
+- [auth](./auth) for header helpers.
+- [effects](./effects) to wrap mutating calls idempotently.

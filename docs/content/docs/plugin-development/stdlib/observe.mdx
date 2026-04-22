@@ -1,0 +1,56 @@
+---
+title: observe
+description: |
+  Trace events, HTTP audit lines, step metadata, and Cloudflare metric hints
+  in `plugins/lib/std/observe`.
+---
+
+`plugins/lib/std/observe.ts` funnels data through **`context.recordTraceEvent`** with **redaction** and **size limits** applied (see [redaction](./redaction) and [limits](./limits)).
+
+## API
+
+| Function | Trace type | Notes |
+| --- | --- | --- |
+| `recordEvent(context, type, detail?, data?)` | your `type` | JSON-clones and redacts `data`. |
+| `recordExternalCall(context, input)` | `http.request` | Redacts sensitive header names. |
+| `recordExternalResult(context, input)` | `http.response` | Status + URL + method. |
+| `logStepMetadataForObservability(context)` | `step.metadata` | Attempt, `stepName`, `stepConfig`. |
+| `recordCloudflareMetricHint(context, eventType, detail?)` | `cloudflare.metric-hint` | Correlates CF lifecycle events. |
+
+**`CLOUDFLARE_WORKFLOW_EVENT_TYPES`** lists allowed **`CloudflareWorkflowEventType`** literals (e.g. `STEP_START`, `ATTEMPT_FAILURE`).
+
+## Example
+
+```ts
+import { logStepMetadataForObservability, recordEvent } from "../../lib/std/observe";
+
+export const run: WorkflowStepRunner = async (context) => {
+  logStepMetadataForObservability(context);
+
+  recordEvent(context, "provider.cache", "hit", {
+    key: cacheKey,
+    ttlSeconds: 300,
+  });
+
+  // ...
+};
+```
+
+`buildHttpRequest`, `fetchJson`, and `fetchText` already call **`recordExternalCall`** / **`recordExternalResult`**—avoid duplicating those unless you have a custom transport.
+
+## Best practices
+
+- Call **`logStepMetadataForObservability`** once near the top of important steps to capture attempt and config in traces.
+- Prefer **small, structured `data`** objects; oversized payloads throw when they exceed trace limits.
+- Do not place secrets in `data`; keys matching [redaction](./redaction) patterns are scrubbed, but design traces as if redaction were best-effort.
+
+<Callout type="warn" title="Context fields">
+
+`logStepMetadataForObservability` uses **`context.stepName`**, **`context.stepContext`**, and **`context.stepConfig`** when the worker populates them—behavior may vary by execution path.
+
+</Callout>
+
+## See also
+
+- [http](./http) — automatic HTTP trace lines.
+- [Concept: Observability](/docs/concepts/observability)

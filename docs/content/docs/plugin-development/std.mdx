@@ -1,0 +1,132 @@
+---
+title: Plugin Standard Library
+description: |
+  Shared helpers in `plugins/lib/std` for config parsing, HTTP requests,
+  idempotent effects, observability, and workflow-safe step results.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+The plugin standard library lives under `plugins/lib/std/`. It is the preferred way to build new plugin steps because it centralizes the parts that are easy to get wrong in a workflow runtime: config parsing, connections, HTTP, retry-safe effects, trace events, and capped outputs.
+
+<Callout type="info" title="Module-by-module docs">
+  See **[Stdlib modules](./stdlib)** for dedicated pages—examples, best practices, and full API notes for each file.
+</Callout>
+
+## Recommended flow
+
+<Steps>
+  <Step>
+
+### Parse config
+
+Use [config](./stdlib/config) and [schema](./stdlib/schema) instead of ad hoc `String(...)` / `Number(...)` in the step body.
+
+  </Step>
+  <Step>
+
+### Resolve connections
+
+Use [connections](./stdlib/connections) and [auth](./stdlib/auth) so missing aliases and secrets fail with consistent messages.
+
+  </Step>
+  <Step>
+
+### Wrap side effects
+
+For outbound creates or paid calls, use [effects](./stdlib/effects) (or [reconcile](./stdlib/reconcile)) so step retries replay completed work safely.
+
+  </Step>
+  <Step>
+
+### Return normalized output
+
+Use [result](./stdlib/result) `ok(detail, output)` so payloads stay JSON-safe and within size limits.
+
+  </Step>
+</Steps>
+
+## Full example
+
+```ts
+import type { WorkflowStepRunner } from "../../runtime";
+import { requireConnection, requireSecret } from "../../lib/std/connections";
+import { renderedStringConfig } from "../../lib/std/config";
+import { executeIdempotentEffect } from "../../lib/std/effects";
+import { buildHttpRequest, fetchJson } from "../../lib/std/http";
+import { logStepMetadataForObservability } from "../../lib/std/observe";
+import { ok } from "../../lib/std/result";
+
+export const run: WorkflowStepRunner = async (context) => {
+  logStepMetadataForObservability(context);
+  const connection = await requireConnection(context);
+  const token = await requireSecret(
+    context,
+    connection,
+    "token",
+    "Provider connection is missing a token secret.",
+  );
+
+  const title = renderedStringConfig(context, "title");
+
+  const output = await executeIdempotentEffect(context, {
+    provider: "example",
+    operation: "create-item",
+    request: { title },
+    perform: async (effectKey) => {
+      const request = buildHttpRequest(context, {
+        method: "POST",
+        url: "https://api.example.com/items",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-Workflow-Effect-Key": effectKey,
+        },
+        body: JSON.stringify({ title }),
+        provider: "example",
+        operation: "create-item",
+      });
+
+      const { response, body } = await fetchJson<{ id: string }>(
+        context,
+        request,
+      );
+      if (!response.ok) {
+        throw new Error(`Provider returned ${response.status}.`);
+      }
+
+      return { id: body.id };
+    },
+  });
+
+  return ok("Created item.", output);
+};
+```
+
+## When not to use it
+
+<Accordions type="single">
+  <Accordion title="Simple pure data transforms">
+
+If a step only reshapes data and never touches a provider, use config helpers and `ok(...)`, but you can skip `executeIdempotentEffect`.
+
+  </Accordion>
+  <Accordion title="Workflow primitives like step.sleep">
+
+Keep those in `executionMode: "inline"` steps. The stdlib still helps with config and results; Cloudflare primitives stay in the step body.
+
+  </Accordion>
+  <Accordion title="Provider-specific semantics">
+
+If a provider has a first-class idempotency or lookup API, keep that logic in the plugin. The stdlib gives shared plumbing, not provider rules.
+
+  </Accordion>
+</Accordions>
+
+<Cards>
+  <Card title="Stdlib modules (reference)" href="./stdlib" description="One page per module with examples and best practices." />
+  <Card title="Plugin Steps" href="./steps" description="Runners, context, and execution modes." />
+</Cards>
+
+See also: [Idempotent effects](/docs/concepts/idempotent-effects) and [Observability](/docs/concepts/observability).

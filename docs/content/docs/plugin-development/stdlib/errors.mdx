@@ -1,0 +1,51 @@
+---
+title: errors
+description: |
+  Normalize thrown values and fail fast on HTTP responses in
+  `plugins/lib/std/errors`.
+---
+
+`plugins/lib/std/errors.ts` standardizes error messages when wrapping provider failures or unknown throws.
+
+## API
+
+| Function | Behavior |
+| --- | --- |
+| `normalizeError(error, input?)` | Returns **`NormalizedError`** with `message`, optional `cause`, `provider`, `operation`, `status`. |
+| `formatProviderError(provider, operation, error)` | Single string for logs or `throw new Error(...)`. |
+| `throwForHttpError(response, fallback, parser?)` | No-op if `response.ok`; else throws `Error` with parsed body or `fallback (status)`. |
+
+## Example
+
+```ts
+import { buildHttpRequest, fetchJson } from "../../lib/std/http";
+import { throwForHttpError, formatProviderError } from "../../lib/std/errors";
+
+try {
+  const request = buildHttpRequest(context, { /* ... */ });
+  const { response, body } = await fetchJson(context, request);
+  await throwForHttpError(response, "Provider request failed", async (res) =>
+    res.text(),
+  );
+  return body;
+} catch (error) {
+  throw new Error(formatProviderError("acme", "users.list", error));
+}
+```
+
+## Best practices
+
+- Use **`throwForHttpError`** immediately after **`fetchJson`/`fetchText`** when you want a single failure path before parsing success bodies.
+- Pass a **`parser`** when APIs return JSON error objects you want surfaced in the exception message.
+- Pair with [fail](./fail) when an HTTP status means **stop the workflow** (e.g. 402 payment required) rather than retry.
+
+<Callout type="info" title="Retry vs terminal">
+
+4xx client errors are often permanent; consider **`failWorkflow`** after mapping status codes. 5xx and network errors are usually retryable with ordinary throws.
+
+</Callout>
+
+## See also
+
+- [http](./http)
+- [fail](./fail)

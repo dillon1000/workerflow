@@ -1,0 +1,52 @@
+---
+title: result
+description: |
+  `ok(...)` step results and `capOutputSize` for run history limits in
+  `plugins/lib/std/result`.
+---
+
+`plugins/lib/std/result.ts` is the standard way to return from **`WorkflowStepRunner`**: a required human **`detail`**, optional **`output`**, and optional **`status`**.
+
+## API
+
+### `capOutputSize(value, maxBytes?)`
+
+- Default cap **900_000** UTF-8 bytes of `JSON.stringify(value)`.
+- Under cap: returns the value as **`JsonValue`**.
+- Over cap: returns `{ truncated: true, preview, originalBytes }`.
+
+### `ok(detail, output?, status?)`
+
+- **`detail`** must be non-empty after trim (throws otherwise).
+- **`output`** is passed through **`capOutputSize`** when provided.
+- **`status`** defaults to **`"complete"`** (`RunStatus`).
+
+## Example
+
+```ts
+import { ok } from "../../lib/std/result";
+
+return ok("Opened ticket ENG-441.", {
+  id: ticket.id,
+  url: ticket.url,
+});
+
+return ok("Skipped: duplicate webhook.", { skipped: true }, "complete");
+```
+
+## Best practices
+
+- Write **`detail`** for operators reading run history—complete sentences beat opaque codes.
+- Keep **`output`** JSON-friendly; cap large blobs (base64, HTML dumps) before returning or store references instead.
+- Use the third argument only when you intentionally need a non-default **`RunStatus`** supported by the app.
+
+<Callout type="info" title="Aligned with limits">
+
+The default cap matches [limits](./limits) **`MAX_STEP_OUTPUT_BYTES`** (900_000). Adjust only when you understand storage and UI impact.
+
+</Callout>
+
+## See also
+
+- [limits](./limits)
+- [Plugin Steps](../steps) — full return shape

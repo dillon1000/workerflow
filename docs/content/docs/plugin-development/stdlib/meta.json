@@ -1,0 +1,26 @@
+{
+  "title": "Stdlib modules",
+  "pages": [
+    "index",
+    "config",
+    "schema",
+    "connections",
+    "auth",
+    "http",
+    "effects",
+    "reconcile",
+    "fail",
+    "retry",
+    "result",
+    "observe",
+    "errors",
+    "guards",
+    "determinism",
+    "match",
+    "time",
+    "limits",
+    "redaction",
+    "pagination",
+    "webhooks"
+  ]
+}

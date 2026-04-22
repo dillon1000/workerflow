@@ -1,0 +1,52 @@
+---
+title: redaction
+description: |
+  Strip sensitive keys from objects and headers before tracing in
+  `plugins/lib/std/redaction`.
+---
+
+`plugins/lib/std/redaction.ts` implements pattern-based redaction for trace-safe data. [observe](./observe) applies it automatically when recording events.
+
+## API
+
+| Function | Behavior |
+| --- | --- |
+| `shouldRedactKey(key)` | Default regex matches `authorization`, `api_key`, `token`, `secret`, `password`, `signature`, `cookie`, etc. |
+| `redactValue(value, replacement?)` | Recursively redacts strings and nested objects/arrays. |
+| `redactObject(input, replacement?)` | Key-based redaction on plain objects. |
+| `redactHeaders(headers?, replacement?)` | Converts headers to object, redacts, returns plain object. |
+| `redactForTrace(value, replacement?)` | No-op for non-objects; otherwise **`redactValue`**. |
+
+## Example
+
+```ts
+import { redactObject, redactHeaders } from "../../lib/std/redaction";
+
+const safe = redactObject({
+  user: "alice",
+  apiKey: "secret",
+  nested: { token: "abc" },
+});
+
+const headers = redactHeaders({
+  Authorization: "Bearer x",
+  "X-Request-Id": "123",
+});
+```
+
+## Best practices
+
+- Treat redaction as **defense in depth**—never log secrets intentionally.
+- Extend patterns only by changing **`DEFAULT_SENSITIVE_PATTERN`** in source when new secret key names appear across providers.
+- When adding custom trace payloads, pass objects through **`redactForTrace`** if they might contain nested credentials.
+
+<Callout type="info" title="Automatic in observe">
+
+`recordEvent` serializes through **`redactForTrace`** before size checks—custom sensitive keys that do not match the pattern may still leak until you rename or preprocess them.
+
+</Callout>
+
+## See also
+
+- [observe](./observe)
+- [limits](./limits) trace size caps

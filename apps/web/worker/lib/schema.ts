@@ -57,19 +57,52 @@ export const workflowRunsTable = pgTable("workflow_runs", {
   runDepth: integer("run_depth"),
 });
 
-export const workflowRunStepsTable = pgTable("workflow_run_steps", {
-  id: text("id").primaryKey(),
-  runId: text("run_id").notNull(),
-  nodeId: text("node_id").notNull(),
-  nodeTitle: text("node_title").notNull(),
-  kind: text("kind").notNull(),
-  status: text("status").notNull(),
-  detail: text("detail").notNull(),
-  outputJson: text("output_json"),
-  startedAt: text("started_at").notNull(),
-  finishedAt: text("finished_at"),
-  durationMs: integer("duration_ms"),
-});
+export const workflowRunStepsTable = pgTable(
+  "workflow_run_steps",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id").notNull(),
+    nodeId: text("node_id").notNull(),
+    nodeTitle: text("node_title").notNull(),
+    kind: text("kind").notNull(),
+    status: text("status").notNull(),
+    detail: text("detail").notNull(),
+    outputJson: text("output_json"),
+    traceJson: text("trace_json"),
+    startedAt: text("started_at").notNull(),
+    finishedAt: text("finished_at"),
+    durationMs: integer("duration_ms"),
+  },
+  (table) => [
+    uniqueIndex("workflow_run_steps_run_node_idx").on(table.runId, table.nodeId),
+  ],
+);
+
+export const workflowEffectsTable = pgTable(
+  "workflow_effects",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    runId: text("run_id").notNull(),
+    nodeId: text("node_id").notNull(),
+    effectKey: text("effect_key").notNull(),
+    provider: text("provider").notNull(),
+    operation: text("operation").notNull(),
+    status: text("status").notNull(),
+    requestHash: text("request_hash").notNull(),
+    outputJson: text("output_json"),
+    remoteRef: text("remote_ref"),
+    error: text("error"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("workflow_effects_user_effect_key_idx").on(
+      table.userId,
+      table.effectKey,
+    ),
+  ],
+);
 
 export const connectionsTable = pgTable(
   "connections",

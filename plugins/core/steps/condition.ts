@@ -1,10 +1,8 @@
 import type { WorkflowStepRunner } from "../../runtime";
+import { ok } from "../../lib/std/result";
 
-export const run: WorkflowStepRunner = async ({ evaluateExpression, node }) => {
-  const expression = String(node.data.config.expression ?? "false");
-  const passed = evaluateExpression(expression);
-  return {
-    detail: `Condition evaluated to ${String(passed)}.`,
-    output: { passed },
-  };
+export const run: WorkflowStepRunner = async (context) => {
+  const expression = String(context.node.data.config.expression ?? "false");
+  const passed = context.evaluateExpression(expression);
+  return ok(`Condition evaluated to ${String(passed)}.`, { passed });
 };

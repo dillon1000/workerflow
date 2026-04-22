@@ -1,0 +1,69 @@
+---
+title: Idempotent Effects
+description: |
+  Retry-safe external side effects in Workerflow and the runtime-backed
+  effect ledger.
+---
+
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+
+When a workflow calls an external API that creates or posts something, retries can duplicate that effect unless the runtime can recognize that the request already happened.
+
+## The rule
+
+For pure computation, replay is fine.
+
+For outbound side effects, replay is dangerous unless the effect is **idempotent**.
+
+## Workerflow’s approach
+
+- build a stable request shape
+- hash it into a request fingerprint
+- derive an `effectKey`
+- claim that effect in the runtime ledger
+- replay the stored output if the effect is already complete
+- otherwise perform the request and store the result
+
+This is what `executeIdempotentEffect(...)` is for.
+
+Workerflow deliberately does not add a second retry layer on top of Cloudflare Workflows. Cloudflare already retries failed steps; the application’s job is to make those retries safe.
+
+## What the ledger does not magically solve
+
+<Accordions type="single">
+  <Accordion title="Providers without native idempotency">
+
+If a provider has no idempotency key and no reliable reconciliation API, exactly-once behavior is impossible. The runtime can still reduce duplication risk and record what happened, but it cannot invent provider guarantees.
+
+  </Accordion>
+  <Accordion title="The gap between remote success and local persistence">
+
+If a provider accepts a request and the worker crashes before the result is written locally, a retry still needs provider-specific reconciliation or a native idempotency key to avoid duplication completely.
+
+  </Accordion>
+  <Accordion title="Generic webhooks">
+
+For generic outbound webhooks, Workerflow sends an effect key, but the receiver still needs to dedupe if exact-once delivery matters.
+
+  </Accordion>
+</Accordions>
+
+## Where to use it
+
+Use the ledger for:
+
+- create issue / create ticket steps
+- outbound webhook posts
+- chat or image requests that may bill or mutate usage
+- message sends to systems that may duplicate on retry
+
+Do not use it for:
+
+- local string transforms
+- condition evaluation
+- static text nodes
+
+## Related docs
+
+- [Plugin Standard Library](/docs/plugin-development/std)
+- [Observability](/docs/concepts/observability)

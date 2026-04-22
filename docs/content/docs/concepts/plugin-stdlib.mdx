@@ -1,0 +1,60 @@
+---
+title: Plugin Standard Library
+description: |
+  Why Workerflow ships a shared plugin standard library and what problem
+  it solves.
+---
+
+The plugin standard library exists to prevent each plugin from re-solving the same workflow-runtime problems in slightly different ways.
+
+Without it, every plugin step tends to duplicate:
+
+- config parsing
+- connection loading
+- request setup
+- error formatting
+- trace emission
+- retry and dedupe logic
+
+That duplication creates drift, inconsistent traces, and retry bugs.
+
+## Design goals
+
+- small enough to stay teachable
+- opinionated around workflow safety
+- runtime-backed where guarantees matter
+- easy to adopt incrementally
+
+## What belongs in the stdlib
+
+Good candidates:
+
+- HTTP builders
+- idempotent effect wrappers
+- trace helpers
+- config decoders
+- result shapers
+- output-size guards
+- deterministic helpers
+
+Bad candidates:
+
+- random convenience utilities with no workflow semantics
+- provider SDK wrappers
+- helpers that hide provider-specific reconciliation logic
+
+## Where it goes next
+
+Good next additions would be:
+
+- pagination helpers
+- rate-limit aware retries
+- schema-driven config decoding
+- response redaction helpers
+- richer provider reconciliation patterns
+
+## Related docs
+
+- [Plugin Development Guide](/docs/plugin-development)
+- [Plugin Standard Library overview](/docs/plugin-development/std)
+- [Stdlib modules (per-file reference)](/docs/plugin-development/stdlib)
